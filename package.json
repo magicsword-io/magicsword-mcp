@@ -1,0 +1,50 @@
+{
+  "name": "@magicsword-io/magicsword-mcp",
+  "version": "0.1.0",
+  "description": "MagicSword MCP server — manage MagicSword conversationally from Claude Desktop, Cursor, or any MCP-aware client.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "magicsword-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "configure": "node dist/index.js configure",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "undici": "^7.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/magicsword-io/magicsword-mcp.git"
+  },
+  "homepage": "https://magicsword.io",
+  "bugs": {
+    "url": "https://github.com/magicsword-io/magicsword-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "magicsword",
+    "edr",
+    "security",
+    "claude"
+  ]
+}
