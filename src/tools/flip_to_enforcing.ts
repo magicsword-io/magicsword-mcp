@@ -70,6 +70,9 @@ export const flipToEnforcingTool = defineTool({
     } catch (err) {
       if (err instanceof MagicSwordApiError && err.status === 409 && err.body && typeof err.body === 'object') {
         const body = err.body as Record<string, unknown>;
+        if (typeof body.error === 'string' && body.error.toLowerCase().includes('already enforcing')) {
+          return textOk(`Policy ${policy_id} is already enforcing; no enforcement flip is needed.`, body);
+        }
         if (Array.isArray(body.blockers) || body.readiness) {
           return renderPreview(policy_id, {
             ...body,

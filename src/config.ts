@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 
-export const DEFAULT_BASE_URL = 'https://app.magicsword.io';
+export const DEFAULT_BASE_URL = 'https://www.magicsword.io';
 
 export interface MagicSwordConfig {
   apiKey: string;

@@ -25,7 +25,7 @@ function printHelp(): void {
       '',
       'Environment:',
       '  MAGICSWORD_API_KEY   API key (msk_...)  — overrides config file',
-      '  MAGICSWORD_BASE_URL  Portal base URL    — defaults to https://app.magicsword.io',
+      '  MAGICSWORD_BASE_URL  Portal base URL    — defaults to https://www.magicsword.io',
       '  MAGICSWORD_CONFIG    Path to config json — defaults to ~/.magicsword/mcp.json',
       '',
     ].join('\n'),

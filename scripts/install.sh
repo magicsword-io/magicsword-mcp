@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 # MagicSword MCP installer (Linux + macOS).
 # Usage:
-#   curl -fsSL https://get.magicsword.io/mcp.sh | sh
-#   curl -fsSL https://get.magicsword.io/mcp.sh | sh -s -- --version 0.1.0
+#   curl -fsSL https://www.magicsword.io/install.sh | sh
+#   curl -fsSL https://www.magicsword.io/install.sh | sh -s -- --version 0.1.0
 #
 # Requires: node >= 22 and npm. If you don't have node, install it first
-# (https://nodejs.org). On macOS, prefer `brew install magicsword-io/magicsword/magicsword-mcp`.
+# (https://nodejs.org), then install this package with npm.
 
 set -eu
 

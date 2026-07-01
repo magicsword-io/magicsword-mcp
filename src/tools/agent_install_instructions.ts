@@ -3,22 +3,21 @@ import { defineTool, textOk } from './shared.js';
 
 const SNIPPETS: Record<'macos' | 'linux' | 'windows', { headline: string; body: string }> = {
   macos: {
-    headline: 'Install the MagicSword agent on macOS (Homebrew tap):',
+    headline: 'Install the MagicSword agent on macOS:',
     body: [
-      'brew tap magicsword-io/magicsword',
-      'brew install magicsword-agent',
+      'Recommended: open Magic Portal and use Add endpoint to generate the current enrollment command.',
       '',
       'Then enroll using a token from `mint_enrollment_token`:',
-      'sudo magicsword-agent enroll --token <ENROLL_TOKEN>',
+      'curl -fsSL https://www.magicsword.io/install.sh | sudo MAGICSWORD_TOKEN=<ENROLL_TOKEN> MAGICSWORD_PORTAL_URL=https://www.magicsword.io bash',
     ].join('\n'),
   },
   linux: {
-    headline: 'Install the MagicSword agent on Linux (curl-pipe):',
+    headline: 'Install the MagicSword agent on Linux:',
     body: [
-      'curl -fsSL https://get.magicsword.io/agent.sh | sudo sh',
+      'Recommended: open Magic Portal and use Add endpoint to generate the current enrollment command.',
       '',
       'Then enroll using a token from `mint_enrollment_token`:',
-      'sudo magicsword-agent enroll --token <ENROLL_TOKEN>',
+      'curl -fsSL https://www.magicsword.io/install.sh | sudo MAGICSWORD_TOKEN=<ENROLL_TOKEN> MAGICSWORD_PORTAL_URL=https://www.magicsword.io bash',
     ].join('\n'),
   },
   windows: {
@@ -27,10 +26,8 @@ const SNIPPETS: Record<'macos' | 'linux' | 'windows', { headline: string; body: 
       'Recommended: open the portal and click "Add endpoint" to launch the magicsword-deployer:// deep link.',
       'It opens the registration UI with the org pre-filled and exchanges a one-time enrollment token automatically.',
       '',
-      'Manual install (winget):',
-      'winget install MagicSword.Deployer',
-      '',
-      'Then either click the deep link from the portal or paste the enrollment token in the tray app\'s Register dialog.',
+      'PowerShell enrollment using a token from `mint_enrollment_token`:',
+      '$env:MAGICSWORD_TOKEN="<ENROLL_TOKEN>"; $env:MAGICSWORD_PORTAL_URL="https://www.magicsword.io"; irm https://www.magicsword.io/install.ps1 | iex',
     ].join('\n'),
   },
 };

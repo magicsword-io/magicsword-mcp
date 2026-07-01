@@ -32,7 +32,7 @@ magicsword-mcp configure
 ```
 
 You'll be prompted for an API key (mint one in **Magic Portal → Settings →
-API Keys**) and a portal base URL (defaults to `https://app.magicsword.io`).
+API Keys**) and a portal base URL (defaults to `https://www.magicsword.io`).
 The command writes `~/.magicsword/mcp.json` (mode 600) and prints the exact
 JSON snippet to paste into Claude Desktop's config:
 
@@ -49,7 +49,7 @@ The snippet looks like this:
       "command": "magicsword-mcp",
       "env": {
         "MAGICSWORD_API_KEY": "msk_...",
-        "MAGICSWORD_BASE_URL": "https://app.magicsword.io"
+        "MAGICSWORD_BASE_URL": "https://www.magicsword.io"
       }
     }
   }
@@ -117,7 +117,7 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
 
 1. `MAGICSWORD_API_KEY` / `MAGICSWORD_BASE_URL` env vars (set by the MCP host).
 2. `~/.magicsword/mcp.json` (or `$MAGICSWORD_CONFIG`).
-3. Default base URL `https://app.magicsword.io`.
+3. Default base URL `https://www.magicsword.io`.
 
 ## Safety notes
 
@@ -142,6 +142,6 @@ infrastructure + tools).
 
 ## Related
 
-- Customer API + key UI: `magicsword-io/magic-portal#822`.
+- Customer API + key UI: `magicsword-io/magic-portal#1010`.
 - Free-user / agent registration UX: `magicsword-io/magicsword-deployer#202`,
   `magicsword-io/magic-portal#823`.
