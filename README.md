@@ -70,7 +70,7 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `triage_alert` | Fetches one alert with process chain + evidence; optionally acknowledges or dismisses it. |
 | `list_policies` | Lists policies with current version + mode. |
 | `show_policy` | Shows one policy by id. |
-| `manage_policy_rules` | Lists rules or adds explicit / event-derived rules to a policy by id or name. |
+| `manage_policy_rules` | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
 | `apply_policy_to_endpoints` | Resolves endpoints by id list or hostname-glob and assigns a policy. |
 | `flip_to_enforcing` | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical. |
 | `list_customer_intel_feeds` | Lists private intel feeds or feed items. |
@@ -106,7 +106,7 @@ Claude: [calls upsert_customer_intel_items]
 
 User:   Show me audited or blocked events from the last day.
 Claude: [calls list_events hours=24 status=audited,blocked]
-        → 31 events. Here are the file paths and hashes.
+        → 31 events. Here are the file paths, publishers, and hashes.
 
 User:   Allow the first 5 on the Workstations policy.
 Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids=[...] status=allowed]
@@ -124,6 +124,11 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
 - **`flip_to_enforcing` is two-step.** The first call returns a server preview
   and one-time confirmation token; you must show the preview to a human and
   pass the token back to commit. Tokens are short-lived and single-use.
+- **Windows WDAC policy edits should not use explicit flat file hashes.**
+  Use `manage_policy_rules` with `event_ids` when approving audit events so
+  the Portal can derive supported path / publisher / filename rules, or use
+  `upsert_customer_intel_items` for hash, AuthentiHash, page-hash, and TBS
+  intelligence in a private feed.
 - **Secrets stay on the user's machine.** The MCP server is a local stdio
   process; the API key is read from `~/.magicsword/mcp.json` (mode 600) or
   an env var passed by the MCP host. Nothing is sent off-machine except
@@ -139,10 +144,5 @@ node dist/index.js --version
 ```
 
 The smoke test validates `--help`, `--version`, configure validation, secret
-redaction in setup output, and npm pack contents.
-
-## Related
-
-- Customer API + key UI: `magicsword-io/magic-portal#1010`.
-- Free-user / agent registration UX: `magicsword-io/magicsword-deployer#202`,
-  `magicsword-io/magic-portal#823`.
+redaction in setup output, MCP tool registration, policy status / enforcement
+handler behavior, and npm pack contents.

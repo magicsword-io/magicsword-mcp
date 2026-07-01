@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 const ruleSchema = z.record(z.unknown()).describe(
-  'Policy rule. Common shapes: {type:"filename", value:"tool.exe", status:"blocked"} or {type:"hash", value:"<sha256>", status:"allowed"}.',
+  'Policy rule. Common Windows WDAC shapes: {type:"filepath", value:"%OSDRIVE%\\\\Tools\\\\tool.exe", status:"blocked"}, {type:"filename", value:"tool.exe", status:"blocked"}, or {type:"publisher", value:{publisherName, signerName, tbsHash}, status:"allowed"}. Do not create explicit type:"hash" rules for Windows WDAC; use event_ids or private intel feeds for hash/AuthentiHash/page-hash IOCs.',
 );
 
 export const managePolicyRulesTool = defineTool({
@@ -10,7 +10,8 @@ export const managePolicyRulesTool = defineTool({
   title: 'List or add policy rules',
   description:
     'Lists policy rules or creates a new policy version with explicit rules or event-derived rules. ' +
-    'Use event_ids with status=allowed for “allow all these audit events on my policy”. Requires policies:read for list and policies:write for add.',
+    'Use event_ids with status=allowed for “allow all these audit events on my policy”; the Portal will derive supported policy rules when possible. ' +
+    'Do not add explicit flat file-hash rules for Windows WDAC. Requires policies:read for list and policies:write for add.',
   inputSchema: {
     action: z.enum(['list', 'add']),
     policy_id: z.string().optional().describe('Policy UUID. Required for list; optional for add if policy_name is provided.'),
