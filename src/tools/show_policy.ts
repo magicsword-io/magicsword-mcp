@@ -1,22 +1,17 @@
 import { z } from 'zod';
-import { defineTool, formatApiError, textError, textOk } from './shared.js';
+import { defineTool, formatApiError, textOk } from './shared.js';
 
 export const showPolicyTool = defineTool({
   name: 'show_policy',
   title: 'Show a single MagicSword policy',
   description:
-    'Returns the active version + status for one policy by id. ' +
-    'Currently implemented by filtering the list_policies output, since the public API does not yet expose a /policies/:id detail route.',
+    'Returns the active version + status for one policy by id.',
   inputSchema: {
     policy_id: z.string().min(1).describe('The policy UUID'),
   },
   async handler({ policy_id }, { client }) {
     try {
-      const result = await client.policies();
-      const policy = result.policies.find((p) => p.id === policy_id);
-      if (!policy) {
-        return textError(`Policy ${policy_id} not found in this org.`);
-      }
+      const { policy } = await client.policy(policy_id);
       const v = policy.current_version;
       const lines = [
         `Policy ${policy.id}`,

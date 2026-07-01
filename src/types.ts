@@ -9,6 +9,8 @@ export type ApiScope =
   | 'alerts:write'
   | 'endpoints:read'
   | 'endpoints:write'
+  | 'intel:read'
+  | 'intel:write'
   | 'tokens:write';
 
 export type Platform = 'windows' | 'macos' | 'linux';
@@ -68,6 +70,43 @@ export interface PoliciesResponse {
   policies: Policy[];
 }
 
+export interface PolicyDetailResponse {
+  policy: Policy;
+}
+
+export interface EventRow {
+  id: string;
+  type: string;
+  name: string;
+  status: 'audited' | 'blocked' | 'allowed' | string;
+  platform?: Platform | string | null;
+  computer_name?: string | null;
+  endpoint_id?: string | null;
+  file_name?: string | null;
+  file_path?: string | null;
+  file_hash?: string | null;
+  publisher?: string | null;
+  certificate_thumbprint?: string | null;
+  is_signed?: boolean | null;
+  intel_match_count?: number | null;
+  intel_match_sources?: string[] | null;
+  linked_policy_ids?: string[] | null;
+  occurrence_count?: number | string | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  data?: Record<string, unknown>;
+}
+
+export interface EventsResponse {
+  events: EventRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  since: string;
+}
+
 // Alert shape is permissive — the public /alerts route returns the full row
 // (`select('*')`), and we don't want to over-constrain a schema that the
 // portal team may extend. Surface what we know, leave the rest as unknown.
@@ -102,6 +141,43 @@ export interface EnrollmentTokenResponse {
   org_id: string;
   expires_at: string;
   ttl_seconds: number;
+}
+
+export interface CustomerIntelFeed {
+  id: string;
+  name: string;
+  description?: string | null;
+  platforms?: Platform[] | string[] | null;
+  is_enabled?: boolean;
+  item_count?: number | null;
+  entry_count?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomerIntelFeedsResponse {
+  feeds: CustomerIntelFeed[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CustomerIntelItem {
+  id: string;
+  source_id: string;
+  data: Record<string, unknown>;
+  entry_hash: string;
+  status?: string;
+  is_deleted?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomerIntelItemsResponse {
+  items: CustomerIntelItem[];
+  total?: number;
+  limit?: number;
+  offset?: number;
 }
 
 export interface ApiErrorBody {

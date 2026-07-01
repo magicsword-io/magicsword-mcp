@@ -45,7 +45,7 @@ async function startServer(): Promise<void> {
     {
       instructions:
         'MagicSword MCP exposes EDR management as conversational tools. Start with `whoami` to confirm the org/plan/scopes. ' +
-        'Use `find_alerts` for triage, `list_endpoints` to scope a fleet, `mint_enrollment_token` to onboard. ' +
+        'Use `find_alerts` and `list_events` for triage, `list_endpoints` to scope a fleet, `upsert_customer_intel_items` to load report IOCs, and `manage_policy_rules` to add approved rules. ' +
         'Destructive operations (`flip_to_enforcing`) require a two-step preview/confirm; never call them without showing ' +
         'the preview to the human first.',
     },

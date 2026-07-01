@@ -126,6 +126,6 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
   process.stdout.write(`  ${claudeDesktopConfigPath()}\n\n`);
   process.stdout.write(`${snippetForClaudeDesktop(cfg)}\n\n`);
   process.stdout.write(
-    'Then restart Claude Desktop. The MCP server will appear as "magicsword" with 10 tools.\n',
+    'Then restart Claude Desktop. The MCP server will appear as "magicsword" with 19 tools.\n',
   );
 }

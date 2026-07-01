@@ -3,12 +3,9 @@ import { defineTool, formatApiError, textError, textOk } from './shared.js';
 import type { Alert } from '../types.js';
 
 /**
- * The /api/public/v1/alerts route does not currently support fetch-by-id, and
- * Plan A's first PR ships read-only alerts (no ack endpoint). We page through
- * recent alerts to locate the requested one and return its evidence + process
- * chain in an LLM-readable form. If `ack: true` is requested we surface a
- * clear "write scope coming soon" message rather than reaching into a
- * different (internal) auth surface.
+ * The /api/public/v1/alerts route does not currently support fetch-by-id. We
+ * page through recent alerts to locate the requested one and return its
+ * evidence + process chain in an LLM-readable form.
  */
 const PAGE_SIZE = 200;
 const MAX_PAGES = 5; // bounded scan; user can pass `since` to narrow the window
@@ -72,11 +69,15 @@ export const triageAlertTool = defineTool({
     since: z.string().optional()
       .describe('ISO8601 lower bound to narrow the search window if the alert is older'),
     ack: z.boolean().optional()
-      .describe('If true, mark the alert acknowledged. Note: ack is not yet supported by the public API — this will return a clear "coming soon" notice.'),
+      .describe('If true, mark the alert acknowledged. Requires alerts:write.'),
     ack_comment: z.string().optional()
       .describe('Comment to record on acknowledgement (only meaningful with ack: true)'),
+    dismiss: z.boolean().optional()
+      .describe('If true, dismiss the alert instead of acknowledging it. Requires alerts:write.'),
+    dismiss_reason: z.string().optional()
+      .describe('Reason to record when dismissing the alert'),
   },
-  async handler({ alert_id, since, ack, ack_comment }, { client }) {
+  async handler({ alert_id, since, ack, ack_comment, dismiss, dismiss_reason }, { client }) {
     try {
       const alert = await findAlert(client, alert_id, since);
       if (!alert) {
@@ -86,12 +87,18 @@ export const triageAlertTool = defineTool({
         );
       }
       let summary = summarize(alert);
+      if (dismiss && ack) {
+        return textError('Use either ack=true or dismiss=true, not both.');
+      }
+      if (dismiss) {
+        const response = await client.dismissAlert(alert_id, dismiss_reason);
+        summary += `\n\nDismissed alert${dismiss_reason ? ` with reason: "${dismiss_reason}"` : ''}.`;
+        return textOk(summary, { alert, dismissal: response as Record<string, unknown> });
+      }
       if (ack) {
-        const ackNote =
-          `\n\n[ack requested] The MagicSword public API does not yet expose alert acknowledgement ` +
-          `(the alerts:write scope exists but the route ships in a follow-up PR). ` +
-          `Recorded request${ack_comment ? ` with comment: "${ack_comment}"` : ''} — please retry once the write endpoint is live.`;
-        summary += ackNote;
+        const response = await client.acknowledgeAlert(alert_id, ack_comment);
+        summary += `\n\nAcknowledged alert${ack_comment ? ` with comment: "${ack_comment}"` : ''}.`;
+        return textOk(summary, { alert, acknowledgement: response as Record<string, unknown> });
       }
       return textOk(summary, alert as unknown as Record<string, unknown>);
     } catch (err) {

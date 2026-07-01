@@ -3,12 +3,10 @@ import { defineTool, formatApiError, globToRegex, textError, textOk } from './sh
 
 export const applyPolicyToEndpointsTool = defineTool({
   name: 'apply_policy_to_endpoints',
-  title: 'Assign a policy to endpoints (preview-only until write API ships)',
+  title: 'Assign a policy to endpoints',
   description:
     'Resolves either an explicit endpoint_ids list or a hostname_pattern (glob) into a concrete set of endpoints, ' +
-    'and would assign the named policy to them. The assign-policy route is not in the customer API yet — until it ' +
-    'ships this tool returns a preview ("would-assign" list) and a clear "coming soon" notice. ' +
-    'Use this to plan rollouts safely while the write side is in flight.',
+    'then assigns the named policy to them via the MagicSword Customer API.',
   inputSchema: {
     policy_id: z.string().min(1).describe('The policy UUID to assign'),
     endpoint_ids: z.array(z.string().min(1)).optional()
@@ -59,14 +57,11 @@ export const applyPolicyToEndpointsTool = defineTool({
         .map((e) => `  - ${e.computer_name ?? '(no name)'}  ${e.id}`)
         .join('\n');
 
-      const note =
-        `\n\n[coming soon] The customer API does not yet expose policy assignment. ` +
-        `When the write endpoint ships, this tool will POST the assignment automatically. ` +
-        `For now, paste this list into the Magic Portal manually or use the agent CLI.`;
+      const response = await client.assignPolicyToEndpoints(policy_id, targetEndpoints.map((e) => e.id));
 
       return textOk(
-        `Would assign policy ${policy_id} (${policy.platform}) to ${targetEndpoints.length} endpoint(s):\n${list}${note}`,
-        { policy_id, would_assign: targetEndpoints },
+        `Assigned policy ${policy_id} (${policy.platform}) to ${targetEndpoints.length} endpoint(s):\n${list}`,
+        { policy_id, assigned: targetEndpoints, response: response as Record<string, unknown> },
       );
     } catch (err) {
       return formatApiError(err);

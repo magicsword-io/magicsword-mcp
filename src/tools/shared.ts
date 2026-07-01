@@ -58,8 +58,7 @@ export function formatApiError(err: unknown): ToolResultContent {
     }
     if (err.status === 404) {
       return textError(
-        `This MagicSword API endpoint isn't available yet. ` +
-          `The customer API ships routes incrementally — write operations like enforcement-flip and assign-policy are not yet exposed. ` +
+        `MagicSword API returned not found. Check the id, org scope, and portal base URL. ` +
           `(Server said: "${err.message}".)`,
       );
     }
