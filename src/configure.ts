@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { homedir, platform } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { configPath, DEFAULT_BASE_URL, type MagicSwordConfig } from './config.js';
+import { configPath, DEFAULT_BASE_URL, isValidMagicSwordApiKey, type MagicSwordConfig } from './config.js';
 
 interface ConfigureOptions {
   apiKey?: string;
@@ -62,16 +62,12 @@ function writeConfig(cfg: MagicSwordConfig): string {
   return target;
 }
 
-function snippetForClaudeDesktop(cfg: MagicSwordConfig): string {
+function snippetForClaudeDesktop(): string {
   return JSON.stringify(
     {
       mcpServers: {
         magicsword: {
           command: 'magicsword-mcp',
-          env: {
-            MAGICSWORD_API_KEY: cfg.apiKey,
-            MAGICSWORD_BASE_URL: cfg.baseUrl,
-          },
         },
       },
     },
@@ -98,9 +94,9 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
 
   if (!opts.nonInteractive) {
     if (!apiKey) {
-      const masked = existingApiKey ? `keep current (${existingApiKey.slice(0, 8)}…)` : 'msk_…';
-      const answered = await prompt('MagicSword API key', masked);
-      apiKey = answered.startsWith('msk_') ? answered : existingApiKey;
+      const suffix = existingApiKey ? ` (press Enter to keep current ${existingApiKey.slice(0, 8)}...)` : '';
+      const answered = await prompt(`MagicSword API key${suffix}`);
+      apiKey = answered.trim() || existingApiKey;
     }
     if (!baseUrl) {
       baseUrl = await prompt('Portal base URL', existingBaseUrl ?? DEFAULT_BASE_URL);
@@ -110,7 +106,7 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
     baseUrl = baseUrl ?? existingBaseUrl ?? DEFAULT_BASE_URL;
   }
 
-  if (!apiKey || !apiKey.startsWith('msk_')) {
+  if (!isValidMagicSwordApiKey(apiKey)) {
     process.stderr.write(
       'A valid MagicSword API key (starting with msk_) is required.\n' +
         'Mint one in Magic Portal → Settings → API Keys.\n',
@@ -124,7 +120,7 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
   process.stdout.write(`\nWrote ${path} (mode 600)\n\n`);
   process.stdout.write('Add this block to your Claude Desktop config:\n');
   process.stdout.write(`  ${claudeDesktopConfigPath()}\n\n`);
-  process.stdout.write(`${snippetForClaudeDesktop(cfg)}\n\n`);
+  process.stdout.write(`${snippetForClaudeDesktop()}\n\n`);
   process.stdout.write(
     'Then restart Claude Desktop. The MCP server will appear as "magicsword" with 19 tools.\n',
   );

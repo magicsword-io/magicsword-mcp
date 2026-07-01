@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { MagicSwordClient } from './client.js';
@@ -6,7 +7,16 @@ import { loadConfig } from './config.js';
 import { runConfigure } from './configure.js';
 import { allTools } from './tools/index.js';
 
-const VERSION = '0.1.0';
+function readPackageVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version?: unknown };
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const VERSION = readPackageVersion();
 
 function printVersion(): void {
   process.stdout.write(`magicsword-mcp ${VERSION}\n`);

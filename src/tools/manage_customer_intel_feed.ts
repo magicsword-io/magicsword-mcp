@@ -5,9 +5,9 @@ const platformSchema = z.enum(['windows', 'macos', 'linux']);
 
 export const manageCustomerIntelFeedTool = defineTool({
   name: 'manage_customer_intel_feed',
-  title: 'Create, edit, or delete a customer-owned intel feed',
+  title: 'Create, edit, or delete a private intel feed',
   description:
-    'Creates, updates, or deletes customer-owned intelligence feeds. Organizations are limited to 3 feeds. Requires intel:write.',
+    'Creates, updates, or deletes private intelligence feeds. Organizations are limited to 3 feeds. Requires intel:write.',
   inputSchema: {
     action: z.enum(['create', 'update', 'delete']).describe('Feed operation'),
     feed_id: z.string().optional().describe('Required for update/delete'),
@@ -21,15 +21,15 @@ export const manageCustomerIntelFeedTool = defineTool({
       if (action === 'create') {
         if (!name) return textError('name is required when action=create.');
         const result = await client.createIntelFeed({ name, description, platforms, is_enabled });
-        return textOk(`Created customer intel feed "${name}".`, result as Record<string, unknown>);
+        return textOk(`Created private intel feed "${name}".`, result as Record<string, unknown>);
       }
       if (!feed_id) return textError(`feed_id is required when action=${action}.`);
       if (action === 'delete') {
         const result = await client.deleteIntelFeed(feed_id);
-        return textOk(`Deleted customer intel feed ${feed_id}.`, result as Record<string, unknown>);
+        return textOk(`Deleted private intel feed ${feed_id}.`, result as Record<string, unknown>);
       }
       const result = await client.updateIntelFeed(feed_id, { name, description, platforms, is_enabled });
-      return textOk(`Updated customer intel feed ${feed_id}.`, result as Record<string, unknown>);
+      return textOk(`Updated private intel feed ${feed_id}.`, result as Record<string, unknown>);
     } catch (err) {
       return formatApiError(err);
     }

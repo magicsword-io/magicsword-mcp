@@ -3,9 +3,9 @@ import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 export const manageCustomerIntelItemTool = defineTool({
   name: 'manage_customer_intel_item',
-  title: 'Edit or delete a customer intel feed item',
+  title: 'Edit or delete a private intel feed item',
   description:
-    'Edits or deletes one item in a customer-owned intelligence feed. Requires intel:write.',
+    'Edits or deletes one item in a private intelligence feed. Requires intel:write.',
   inputSchema: {
     action: z.enum(['update', 'delete']),
     feed_id: z.string().min(1),

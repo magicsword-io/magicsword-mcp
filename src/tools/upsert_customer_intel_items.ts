@@ -7,11 +7,11 @@ const intelItemSchema = z.record(z.unknown()).describe(
 
 export const upsertCustomerIntelItemsTool = defineTool({
   name: 'upsert_customer_intel_items',
-  title: 'Add or update indicators in a customer-owned intel feed',
+  title: 'Add or update indicators in a private intel feed',
   description:
-    'Bulk upserts up to 100 indicators into a customer-owned feed. This is the MCP path for “extract IOCs from this report and add them to MagicSword.” Requires intel:write.',
+    'Bulk upserts up to 100 indicators into a private feed. This is the MCP path for “extract IOCs from this report and add them to MagicSword.” Requires intel:write.',
   inputSchema: {
-    feed_id: z.string().min(1).describe('Customer-owned feed UUID'),
+    feed_id: z.string().min(1).describe('Private feed UUID'),
     items: z.array(intelItemSchema).min(1).max(100).describe('Indicators to upsert'),
   },
   async handler({ feed_id, items }, { client }) {

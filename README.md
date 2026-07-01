@@ -46,11 +46,7 @@ The snippet looks like this:
 {
   "mcpServers": {
     "magicsword": {
-      "command": "magicsword-mcp",
-      "env": {
-        "MAGICSWORD_API_KEY": "msk_...",
-        "MAGICSWORD_BASE_URL": "https://www.magicsword.io"
-      }
+      "command": "magicsword-mcp"
     }
   }
 }
@@ -58,6 +54,10 @@ The snippet looks like this:
 
 Restart Claude Desktop and "magicsword" will appear with 19 tools. Logs are
 at `~/Library/Logs/Claude/mcp*.log` on macOS.
+
+If you need a per-client override instead of `~/.magicsword/mcp.json`, set
+`MAGICSWORD_API_KEY` and optionally `MAGICSWORD_BASE_URL` in that MCP host's
+environment. Keep API keys out of shared config snippets and screenshots.
 
 ## Tools
 
@@ -73,10 +73,10 @@ at `~/Library/Logs/Claude/mcp*.log` on macOS.
 | `manage_policy_rules` | Lists rules or adds explicit / event-derived rules to a policy by id or name. |
 | `apply_policy_to_endpoints` | Resolves endpoints by id list or hostname-glob and assigns a policy. |
 | `flip_to_enforcing` | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical. |
-| `list_customer_intel_feeds` | Lists customer-owned intel feeds or feed items. |
-| `manage_customer_intel_feed` | Creates, updates, or deletes customer-owned intel feeds. |
-| `manage_customer_intel_item` | Edits or deletes one customer-owned intel feed item. |
-| `upsert_customer_intel_items` | Adds indicators extracted from reports into a customer-owned feed. |
+| `list_customer_intel_feeds` | Lists private intel feeds or feed items. |
+| `manage_customer_intel_feed` | Creates, updates, or deletes private intel feeds. |
+| `manage_customer_intel_item` | Edits or deletes one private intel feed item. |
+| `upsert_customer_intel_items` | Adds indicators extracted from reports into a private feed. |
 | `manage_policy_intel_sources` | Lists, attaches, or detaches intel feeds on a policy. |
 | `upgrade_endpoints` | Queues agent upgrades for one endpoint, a selected list, a platform, or hostname-glob results. |
 | `request_endpoint_checkin` | Queues an endpoint check-in command. |
@@ -134,11 +134,12 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
 ```sh
 npm install
 npm run build
+npm test
 node dist/index.js --version
 ```
 
-Tests can be added under `__tests__/` (none yet — first PR ships
-infrastructure + tools).
+The smoke test validates `--help`, `--version`, configure validation, secret
+redaction in setup output, and npm pack contents.
 
 ## Related
 
