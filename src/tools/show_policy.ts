@@ -23,7 +23,8 @@ export const showPolicyTool = defineTool({
         lines.push('', 'Current version:');
         lines.push(`  Name: ${v.name ?? '(unnamed)'}`);
         lines.push(`  Version: ${v.version}`);
-        lines.push(`  Mode: ${v.policy_mode}`);
+        lines.push(`  Status: ${v.status ?? 'unknown'} (audit/enforcing/disabled)`);
+        lines.push(`  Policy mode: ${v.policy_mode} (blocklist/strict)`);
         lines.push(`  Updated: ${v.updated_at}`);
         if (v.change_message) lines.push(`  Change message: ${v.change_message}`);
       } else {

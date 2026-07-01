@@ -5,9 +5,9 @@ export const listPoliciesTool = defineTool({
   name: 'list_policies',
   title: 'List MagicSword policies',
   description:
-    'Lists policies in the MagicSword org, including each policy\'s current published version (name, version, mode). ' +
+    'Lists policies in the MagicSword org, including each policy\'s current published version (name, version, status, policy mode). ' +
     'Filter by platform if you only care about windows / macos / linux. The current_version block tells you ' +
-    'whether a policy is in audit or enforcing mode.',
+    'status (audit/enforcing/disabled) separately from policy_mode (blocklist/strict).',
   inputSchema: {
     platform: z.enum(['windows', 'macos', 'linux']).optional()
       .describe('Restrict to one platform'),
@@ -22,7 +22,7 @@ export const listPoliciesTool = defineTool({
         const v = p.current_version;
         const head = `- [${p.platform}] ${v?.name ?? '(unnamed)'} — id: ${p.id}`;
         const versionLine = v
-          ? `    version: ${v.version}  mode: ${v.policy_mode}  updated: ${v.updated_at}`
+          ? `    version: ${v.version}  status: ${v.status ?? 'unknown'}  policy_mode: ${v.policy_mode}  updated: ${v.updated_at}`
           : `    (no published version)`;
         return [head, versionLine].join('\n');
       });

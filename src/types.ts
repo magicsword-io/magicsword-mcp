@@ -53,7 +53,8 @@ export interface PolicyVersion {
   policy_id: string;
   name: string | null;
   version: number | string;
-  policy_mode: 'audit' | 'enforcing' | string;
+  status?: 'disabled' | 'audit' | 'enforcing' | string | null;
+  policy_mode: 'blocklist' | 'strict' | string;
   change_message: string | null;
   updated_at: string;
 }
