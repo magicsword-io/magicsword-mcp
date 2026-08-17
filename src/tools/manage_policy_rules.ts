@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
-const ruleSchema = z.record(z.unknown()).describe(
-  'Policy rule. Common Windows WDAC shapes: {type:"filepath", value:"%OSDRIVE%\\\\Tools\\\\tool.exe", status:"blocked"}, {type:"filename", value:"tool.exe", status:"blocked"}, or {type:"publisher", value:{publisherName, signerName, tbsHash}, status:"allowed"}. Do not create explicit type:"hash" rules for Windows WDAC; use event_ids or private intel feeds for hash/AuthentiHash/page-hash IOCs.',
-);
+const ruleSchema = z
+  .record(z.unknown())
+  .describe(
+    'Policy rule. Common Windows WDAC shapes: {type:"filepath", value:"%OSDRIVE%\\\\Tools\\\\tool.exe", status:"blocked"}, {type:"filename", value:"tool.exe", status:"blocked"}, or {type:"publisher", value:{publisherName, signerName, tbsHash}, status:"allowed"}. Do not create explicit type:"hash" rules for Windows WDAC; use event_ids or private intel feeds for hash/AuthentiHash/page-hash IOCs.',
+  );
 
 export const managePolicyRulesTool = defineTool({
   name: 'manage_policy_rules',
@@ -14,17 +16,32 @@ export const managePolicyRulesTool = defineTool({
     'Do not add explicit flat file-hash rules for Windows WDAC. Requires policies:read for list and policies:write for add.',
   inputSchema: {
     action: z.enum(['list', 'add']),
-    policy_id: z.string().optional().describe('Policy UUID. Required for list; optional for add if policy_name is provided.'),
-    policy_name: z.string().optional().describe('Policy current-version name for add when policy_id is unknown.'),
+    policy_id: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Policy UUID. Required for list; optional for add if policy_name is provided.'),
+    policy_name: z
+      .string()
+      .min(1)
+      .max(4096)
+      .optional()
+      .describe('Policy current-version name for add when policy_id is unknown.'),
     platform: z.enum(['windows', 'macos', 'linux']).optional().describe('Disambiguates policy_name matches'),
     rules: z.array(ruleSchema).max(100).optional().describe('Explicit rules to add/update'),
-    event_ids: z.array(z.string().min(1)).max(100).optional().describe('Telemetry event IDs to turn into rules'),
-    status: z.enum(['allowed', 'blocked', 'disabled']).optional().describe('Status for event-derived rules; defaults to allowed'),
-    type: z.string().optional().describe('Optional rule type override for event-derived rules'),
+    event_ids: z.array(z.string().uuid()).max(100).optional().describe('Telemetry event IDs to turn into rules'),
+    status: z
+      .enum(['allowed', 'blocked', 'disabled'])
+      .optional()
+      .describe('Status for event-derived rules; defaults to allowed'),
+    type: z.string().max(4096).optional().describe('Optional rule type override for event-derived rules'),
     limit: z.number().int().positive().max(500).optional(),
     offset: z.number().int().min(0).optional(),
   },
-  async handler({ action, policy_id, policy_name, platform, rules, event_ids, status, type, limit, offset }, { client }) {
+  async handler(
+    { action, policy_id, policy_name, platform, rules, event_ids, status, type, limit, offset },
+    { client },
+  ) {
     try {
       if (action === 'list') {
         if (!policy_id) return textError('policy_id is required when action=list.');

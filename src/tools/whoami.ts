@@ -5,7 +5,7 @@ export const whoamiTool = defineTool({
   title: 'Identify the MagicSword org and key',
   description:
     'Returns the MagicSword organization, API key id, and granted scopes for the configured key. ' +
-    'Call this first when troubleshooting access — it answers "who am I, what plan, what can this key do?". ' +
+    'Call this first when troubleshooting access — it answers "who am I and what can this key do?". ' +
     'Useful before any other tool to confirm the key is still valid.',
   inputSchema: {},
   async handler(_args, { client }) {

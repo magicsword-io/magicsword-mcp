@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineTool, formatApiError, globToRegex, textError, textOk } from './shared.js';
+import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 export const applyPolicyToEndpointsTool = defineTool({
   name: 'apply_policy_to_endpoints',
@@ -8,12 +8,22 @@ export const applyPolicyToEndpointsTool = defineTool({
     'Resolves either an explicit endpoint_ids list or a hostname_pattern (glob) into a concrete set of endpoints, ' +
     'then assigns the named policy to them via the MagicSword Customer API.',
   inputSchema: {
-    policy_id: z.string().min(1).describe('The policy UUID to assign'),
-    endpoint_ids: z.array(z.string().min(1)).optional()
+    policy_id: z.string().uuid().describe('The policy UUID to assign'),
+    endpoint_ids: z
+      .array(z.string().uuid())
+      .min(1)
+      .max(500)
+      .optional()
       .describe('Explicit list of endpoint UUIDs. Mutually exclusive with hostname_pattern.'),
-    hostname_pattern: z.string().optional()
+    hostname_pattern: z
+      .string()
+      .min(1)
+      .max(255)
+      .optional()
       .describe('Glob pattern (case-insensitive) matched against computer_name. Mutually exclusive with endpoint_ids.'),
-    platform: z.enum(['windows', 'macos', 'linux']).optional()
+    platform: z
+      .enum(['windows', 'macos', 'linux'])
+      .optional()
       .describe('Optional platform filter, applied when resolving hostname_pattern'),
   },
   async handler({ policy_id, endpoint_ids, hostname_pattern, platform }, { client }) {
@@ -37,31 +47,49 @@ export const applyPolicyToEndpointsTool = defineTool({
       let targetEndpoints: { id: string; computer_name: string | null }[] = [];
 
       if (endpoint_ids?.length) {
-        targetEndpoints = endpoint_ids.map((id) => ({ id, computer_name: null }));
+        targetEndpoints = endpoint_ids.map((id) => ({
+          id,
+          computer_name: null,
+        }));
       } else if (hostname_pattern) {
-        const re = globToRegex(hostname_pattern);
-        const result = await client.endpoints({ platform, limit: 500 });
-        targetEndpoints = result.endpoints
-          .filter((e) => e.computer_name && re.test(e.computer_name))
-          .map((e) => ({ id: e.id, computer_name: e.computer_name }));
+        const result = await client.endpoints({
+          platform,
+          hostname_pattern,
+          limit: 500,
+        });
+        if (result.total > result.endpoints.length) {
+          return textError(
+            `Hostname pattern matched ${result.total} endpoints, above the 500-endpoint assignment limit. ` +
+              'Narrow the pattern or assign explicit endpoint IDs.',
+          );
+        }
+        targetEndpoints = result.endpoints.map((e) => ({
+          id: e.id,
+          computer_name: e.computer_name,
+        }));
       }
 
       if (targetEndpoints.length === 0) {
-        return textOk(
-          `No endpoints matched. Nothing to assign. (policy_id=${policy_id})`,
-          { policy_id, would_assign: [] },
-        );
+        return textOk(`No endpoints matched. Nothing to assign. (policy_id=${policy_id})`, {
+          policy_id,
+          would_assign: [],
+        });
       }
 
-      const list = targetEndpoints
-        .map((e) => `  - ${e.computer_name ?? '(no name)'}  ${e.id}`)
-        .join('\n');
+      const list = targetEndpoints.map((e) => `  - ${e.computer_name ?? '(no name)'}  ${e.id}`).join('\n');
 
-      const response = await client.assignPolicyToEndpoints(policy_id, targetEndpoints.map((e) => e.id));
+      const response = await client.assignPolicyToEndpoints(
+        policy_id,
+        targetEndpoints.map((e) => e.id),
+      );
 
       return textOk(
         `Assigned policy ${policy_id} (${policy.platform}) to ${targetEndpoints.length} endpoint(s):\n${list}`,
-        { policy_id, assigned: targetEndpoints, response: response as Record<string, unknown> },
+        {
+          policy_id,
+          assigned: targetEndpoints,
+          response: response as Record<string, unknown>,
+        },
       );
     } catch (err) {
       return formatApiError(err);

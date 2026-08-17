@@ -10,9 +10,9 @@ export const manageCustomerIntelFeedTool = defineTool({
     'Creates, updates, or deletes private intelligence feeds. Organizations are limited to 3 feeds. Requires intel:write.',
   inputSchema: {
     action: z.enum(['create', 'update', 'delete']).describe('Feed operation'),
-    feed_id: z.string().optional().describe('Required for update/delete'),
-    name: z.string().optional().describe('Feed name for create/update'),
-    description: z.string().optional().describe('Optional feed description'),
+    feed_id: z.string().uuid().optional().describe('Required for update/delete'),
+    name: z.string().min(1).max(255).optional().describe('Feed name for create/update'),
+    description: z.string().max(4096).optional().describe('Optional feed description'),
     platforms: z.array(platformSchema).optional().describe('Platforms this feed applies to'),
     is_enabled: z.boolean().optional().describe('Enable/disable matching for this feed'),
   },
@@ -20,7 +20,12 @@ export const manageCustomerIntelFeedTool = defineTool({
     try {
       if (action === 'create') {
         if (!name) return textError('name is required when action=create.');
-        const result = await client.createIntelFeed({ name, description, platforms, is_enabled });
+        const result = await client.createIntelFeed({
+          name,
+          description,
+          platforms,
+          is_enabled,
+        });
         return textOk(`Created private intel feed "${name}".`, result as Record<string, unknown>);
       }
       if (!feed_id) return textError(`feed_id is required when action=${action}.`);
@@ -28,7 +33,12 @@ export const manageCustomerIntelFeedTool = defineTool({
         const result = await client.deleteIntelFeed(feed_id);
         return textOk(`Deleted private intel feed ${feed_id}.`, result as Record<string, unknown>);
       }
-      const result = await client.updateIntelFeed(feed_id, { name, description, platforms, is_enabled });
+      const result = await client.updateIntelFeed(feed_id, {
+        name,
+        description,
+        platforms,
+        is_enabled,
+      });
       return textOk(`Updated private intel feed ${feed_id}.`, result as Record<string, unknown>);
     } catch (err) {
       return formatApiError(err);

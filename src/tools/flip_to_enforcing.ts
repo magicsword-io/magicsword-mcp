@@ -4,7 +4,7 @@ import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 function renderPreview(policyId: string, preview: Record<string, unknown>): ReturnType<typeof textOk> {
   const confirmation = preview.confirmation as { token?: string; expires_at?: string } | undefined;
-  const blockers = Array.isArray(preview.blockers) ? preview.blockers as string[] : [];
+  const blockers = Array.isArray(preview.blockers) ? (preview.blockers as string[]) : [];
   const readiness = preview.readiness as Record<string, unknown> | undefined;
   const preflight = preview.preflight as Record<string, unknown> | undefined;
 
@@ -21,7 +21,10 @@ function renderPreview(policyId: string, preview: Record<string, unknown>): Retu
   if (blockers.length > 0) {
     lines.push('', 'Blockers:');
     for (const blocker of blockers) lines.push(`  - ${blocker}`);
-    lines.push('', 'If the human accepts these blockers, re-run preview with acknowledge_blockers=true to mint an acknowledged token.');
+    lines.push(
+      '',
+      'If the human accepts these blockers, re-run preview with acknowledge_blockers=true to mint an acknowledged token.',
+    );
   } else {
     lines.push('', 'No blockers reported.');
   }
@@ -46,10 +49,16 @@ export const flipToEnforcingTool = defineTool({
     'First call without confirmation_token to get readiness, blockers, endpoint count, and a one-time token. ' +
     'Show the preview to the human. Second call with confirmation_token to commit. Requires policies:write.',
   inputSchema: {
-    policy_id: z.string().min(1).describe('Policy UUID to flip'),
-    acknowledge_blockers: z.boolean().optional()
+    policy_id: z.string().uuid().describe('Policy UUID to flip'),
+    acknowledge_blockers: z
+      .boolean()
+      .optional()
       .describe('Set true only when the human explicitly accepts preview blockers. Used on the preview call.'),
-    confirmation_token: z.string().optional()
+    confirmation_token: z
+      .string()
+      .min(1)
+      .max(4096)
+      .optional()
       .describe('Token returned by the preview call. Passing this commits enforcement.'),
   },
   async handler({ policy_id, acknowledge_blockers, confirmation_token }, { client }) {
@@ -59,7 +68,10 @@ export const flipToEnforcingTool = defineTool({
         return textOk(`Policy ${policy_id} was flipped to enforcing.`, result as Record<string, unknown>);
       }
 
-      const structured = await client.enforcePreview(policy_id, acknowledge_blockers === true) as Record<string, unknown>;
+      const structured = (await client.enforcePreview(policy_id, acknowledge_blockers === true)) as Record<
+        string,
+        unknown
+      >;
       const confirmation = structured.confirmation as { token?: string; expires_at?: string } | undefined;
 
       if (!confirmation?.token) {

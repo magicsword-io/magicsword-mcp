@@ -17,10 +17,7 @@ export interface ToolDefinition<Shape extends ZodRawShape> {
   title: string;
   description: string;
   inputSchema: Shape;
-  handler: (
-    args: { [K in keyof Shape]: z.infer<Shape[K]> },
-    ctx: ToolContext,
-  ) => Promise<ToolResultContent>;
+  handler: (args: { [K in keyof Shape]: z.infer<Shape[K]> }, ctx: ToolContext) => Promise<ToolResultContent>;
 }
 
 export function defineTool<Shape extends ZodRawShape>(def: ToolDefinition<Shape>): ToolDefinition<Shape> {
@@ -83,17 +80,4 @@ export function textError(text: string): ToolResultContent {
     content: [{ type: 'text', text }],
     isError: true,
   };
-}
-
-/** Compile a glob like `prod-*-db?` into a RegExp anchored to the full string. Case-insensitive. */
-export function globToRegex(glob: string): RegExp {
-  let out = '^';
-  for (const ch of glob) {
-    if (ch === '*') out += '.*';
-    else if (ch === '?') out += '.';
-    else if ('\\^$.|+()[]{}'.includes(ch)) out += `\\${ch}`;
-    else out += ch;
-  }
-  out += '$';
-  return new RegExp(out, 'i');
 }

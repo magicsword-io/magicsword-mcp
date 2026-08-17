@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
-const intelItemSchema = z.record(z.unknown()).describe(
-  'One indicator. Supported fields include filename/file_name, filepath/file_path/path, AuthentiHash/authentihash, pagehash/page_file_hash, and tbs_hash with publisher. hash/file_hash can be stored for IOC correlation when that is all a report provides, but do not use flat file hashes as Windows WDAC policy rules.',
-);
+const intelItemSchema = z
+  .record(z.unknown())
+  .describe(
+    'One indicator. Supported fields include filename/file_name, filepath/file_path/path, AuthentiHash/authentihash, pagehash/page_file_hash, and tbs_hash with publisher. hash/file_hash can be stored for IOC correlation when that is all a report provides, but do not use flat file hashes as Windows WDAC policy rules.',
+  );
 
 export const upsertCustomerIntelItemsTool = defineTool({
   name: 'upsert_customer_intel_items',
@@ -11,7 +13,7 @@ export const upsertCustomerIntelItemsTool = defineTool({
   description:
     'Bulk upserts up to 100 indicators into a private feed. This is the MCP path for “extract IOCs from this report and add them to MagicSword.” Requires intel:write.',
   inputSchema: {
-    feed_id: z.string().min(1).describe('Private feed UUID'),
+    feed_id: z.string().uuid().describe('Private feed UUID'),
     items: z.array(intelItemSchema).min(1).max(100).describe('Indicators to upsert'),
   },
   async handler({ feed_id, items }, { client }) {

@@ -4,10 +4,9 @@ import { defineTool, formatApiError, textOk } from './shared.js';
 export const listCustomerIntelFeedsTool = defineTool({
   name: 'list_customer_intel_feeds',
   title: 'List private intelligence feeds',
-  description:
-    'Lists private intelligence feeds and, optionally, a page of items for one feed. Requires intel:read.',
+  description: 'Lists private intelligence feeds and, optionally, a page of items for one feed. Requires intel:read.',
   inputSchema: {
-    feed_id: z.string().optional().describe('Optional feed UUID. When provided, include feed items.'),
+    feed_id: z.string().uuid().optional().describe('Optional feed UUID. When provided, include feed items.'),
     limit: z.number().int().min(1).max(500).optional().describe('Item/feed page size'),
     offset: z.number().int().min(0).optional().describe('Pagination offset'),
   },

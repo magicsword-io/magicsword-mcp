@@ -34,11 +34,25 @@ export interface Endpoint {
   status: string | null;
   compliance_status: string | null;
   installer_version: string | null;
+  os_version?: string | null;
+  architecture?: string | null;
   policy_id: string | null;
+  macos_policy_id?: string | null;
+  desired_policy_ids?: string[] | null;
   last_checkin: string | null;
   last_heartbeat: string | null;
+  update_status?: string | null;
+  update_target_version?: string | null;
+  update_started_at?: string | null;
+  update_error_code?: string | null;
+  amsi_enabled?: boolean | null;
+  amsi_rules_version?: string | null;
+  amsi_detection_count?: number | null;
+  last_amsi_detection_at?: string | null;
   created_at: string;
+  updated_at?: string;
   uninstalled_at: string | null;
+  uninstall_reason?: string | null;
 }
 
 export interface EndpointsResponse {
@@ -46,6 +60,10 @@ export interface EndpointsResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface EndpointDetailResponse {
+  endpoint: Endpoint;
 }
 
 export interface PolicyVersion {
@@ -108,24 +126,33 @@ export interface EventsResponse {
   since: string;
 }
 
-// Alert shape is permissive — the public /alerts route returns the full row
-// (`select('*')`), and we don't want to over-constrain a schema that the
-// portal team may extend. Surface what we know, leave the rest as unknown.
 export interface Alert {
   id: string;
-  organization_id: string;
+  alert_type?: string | null;
   endpoint_id?: string | null;
+  endpoint_name?: string | null;
+  endpoint_names?: string[] | null;
   severity?: 'critical' | 'high' | 'medium' | 'low' | 'info' | string | null;
   title?: string | null;
   description?: string | null;
-  computer_name?: string | null;
-  mitre_technique?: string | null;
+  user_name?: string | null;
+  triggering_event_id?: string | null;
+  triggering_events?: unknown[] | null;
+  event_count?: number | null;
+  time_window_minutes?: number | null;
+  rule_type?: string | null;
+  file_path?: string | null;
+  file_hash?: string | null;
+  publisher?: string | null;
+  intel_source_id?: string | null;
+  intel_source_name?: string | null;
+  metadata?: Record<string, unknown> | null;
   mitre_techniques?: string[] | null;
-  process_chain?: unknown;
-  evidence?: unknown;
   acknowledged_at?: string | null;
   acknowledged_by?: string | null;
-  ack_comment?: string | null;
+  dismissed_at?: string | null;
+  triage_status?: string | null;
+  superseded_by_alert_id?: string | null;
   created_at: string;
   [key: string]: unknown;
 }
@@ -135,6 +162,27 @@ export interface AlertsResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+export interface AlertDetailResponse {
+  alert: Alert;
+}
+
+export interface AgentRelease {
+  id: string;
+  version: string;
+  release_notes?: string | null;
+  min_upgrade_version?: string | null;
+  is_latest?: boolean;
+  is_latest_windows?: boolean;
+  is_latest_macos?: boolean;
+  is_latest_linux?: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AgentReleasesResponse {
+  releases: AgentRelease[];
 }
 
 export interface EnrollmentTokenResponse {

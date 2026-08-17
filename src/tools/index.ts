@@ -17,10 +17,15 @@ import { upsertCustomerIntelItemsTool } from './upsert_customer_intel_items.js';
 import { managePolicyIntelSourcesTool } from './manage_policy_intel_sources.js';
 import { upgradeEndpointsTool } from './upgrade_endpoints.js';
 import { requestEndpointCheckinTool } from './request_endpoint_checkin.js';
+import { showEndpointTool } from './show_endpoint.js';
+import { listAgentReleasesTool } from './list_agent_releases.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 
 export const allTools = [
   whoamiTool,
   listEndpointsTool,
+  showEndpointTool,
+  listAgentReleasesTool,
   findAlertsTool,
   listEventsTool,
   triageAlertTool,
@@ -39,3 +44,37 @@ export const allTools = [
   mintEnrollmentTokenTool,
   agentInstallInstructionsTool,
 ];
+
+const READ_ONLY_TOOLS = new Set([
+  'whoami',
+  'list_endpoints',
+  'show_endpoint',
+  'list_agent_releases',
+  'find_alerts',
+  'list_events',
+  'list_policies',
+  'show_policy',
+  'list_customer_intel_feeds',
+  'agent_install_instructions',
+]);
+
+const DESTRUCTIVE_TOOLS = new Set([
+  'triage_alert',
+  'manage_policy_rules',
+  'apply_policy_to_endpoints',
+  'flip_to_enforcing',
+  'manage_customer_intel_feed',
+  'manage_customer_intel_item',
+  'manage_policy_intel_sources',
+  'upgrade_endpoints',
+]);
+
+export function annotationsForTool(name: string): ToolAnnotations {
+  const readOnly = READ_ONLY_TOOLS.has(name);
+  return {
+    readOnlyHint: readOnly,
+    destructiveHint: readOnly ? false : DESTRUCTIVE_TOOLS.has(name),
+    idempotentHint: readOnly,
+    openWorldHint: false,
+  };
+}

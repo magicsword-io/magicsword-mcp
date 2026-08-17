@@ -5,7 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { MagicSwordClient } from './client.js';
 import { loadConfig } from './config.js';
 import { runConfigure } from './configure.js';
-import { allTools } from './tools/index.js';
+import { allTools, annotationsForTool } from './tools/index.js';
 
 function readPackageVersion(): string {
   try {
@@ -37,6 +37,9 @@ function printHelp(): void {
       '  MAGICSWORD_API_KEY   API key (msk_...)  — overrides config file',
       '  MAGICSWORD_BASE_URL  Portal base URL    — defaults to https://www.magicsword.io',
       '  MAGICSWORD_CONFIG    Path to config json — defaults to ~/.magicsword/mcp.json',
+      '  MAGICSWORD_REQUEST_TIMEOUT_MS  Request timeout (default 30000)',
+      '  MAGICSWORD_RESPONSE_MAX_BYTES  Response cap (default 4194304)',
+      '  MAGICSWORD_GET_RETRIES         Transient GET retries (default 2)',
       '',
     ].join('\n'),
   );
@@ -48,14 +51,17 @@ async function startServer(): Promise<void> {
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
     userAgent: `magicsword-mcp/${VERSION}`,
+    requestTimeoutMs: config.requestTimeoutMs,
+    responseMaxBytes: config.responseMaxBytes,
+    getRetries: config.getRetries,
   });
 
   const server = new McpServer(
     { name: 'magicsword-mcp', version: VERSION },
     {
       instructions:
-        'MagicSword MCP exposes EDR management as conversational tools. Start with `whoami` to confirm the org/plan/scopes. ' +
-        'Use `find_alerts` and `list_events` for triage, `list_endpoints` to scope a fleet, `upsert_customer_intel_items` to load report IOCs, and `manage_policy_rules` to add approved rules. ' +
+        'MagicSword MCP exposes EDR management as conversational tools. Start with `whoami` to confirm the organization, key, and scopes. ' +
+        'Use `find_alerts`, `triage_alert`, and `list_events` for triage; `list_endpoints` then `show_endpoint` to inspect a fleet; `list_agent_releases` before upgrades; `upsert_customer_intel_items` to load report IOCs; and `manage_policy_rules` to add approved rules. ' +
         'For Windows WDAC, do not create explicit flat file-hash policy rules; use event_ids so the Portal can derive supported rules, or use private intel feeds for hash/AuthentiHash/page-hash/TBS IOCs. ' +
         'Destructive operations (`flip_to_enforcing`) require a two-step preview/confirm; never call them without showing ' +
         'the preview to the human first.',
@@ -69,6 +75,7 @@ async function startServer(): Promise<void> {
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        annotations: annotationsForTool(tool.name),
       },
       async (args: Record<string, unknown>) => {
         const result = await tool.handler(args as never, { client });
@@ -124,6 +131,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  process.stderr.write(`Fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+  process.stderr.write(`Fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
   process.exit(1);
 });

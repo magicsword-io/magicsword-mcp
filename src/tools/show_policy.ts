@@ -4,10 +4,9 @@ import { defineTool, formatApiError, textOk } from './shared.js';
 export const showPolicyTool = defineTool({
   name: 'show_policy',
   title: 'Show a single MagicSword policy',
-  description:
-    'Returns the active version + status for one policy by id.',
+  description: 'Returns the active version + status for one policy by id.',
   inputSchema: {
-    policy_id: z.string().min(1).describe('The policy UUID'),
+    policy_id: z.string().uuid().describe('The policy UUID'),
   },
   async handler({ policy_id }, { client }) {
     try {

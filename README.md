@@ -16,14 +16,16 @@ the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
 ## Install
 
-### From npm
+### From npm (after the first release)
 
 ```sh
 npm install -g @magicsword-io/magicsword-mcp
 ```
 
-Requires Node 22+. Homebrew, winget, and curl installer packaging should be
-published after the npm package is released and checksums are available.
+Requires Node 22+. The package is not published yet; the repository includes
+an OIDC trusted-publishing workflow for the first production release. Homebrew,
+winget, and curl packaging can follow once signed release artifacts and
+checksums are available.
 
 ## Configure
 
@@ -52,7 +54,7 @@ The snippet looks like this:
 }
 ```
 
-Restart Claude Desktop and "magicsword" will appear with 19 tools. Logs are
+Restart Claude Desktop and "magicsword" will appear with 21 tools. Logs are
 at `~/Library/Logs/Claude/mcp*.log` on macOS.
 
 If you need a per-client override instead of `~/.magicsword/mcp.json`, set
@@ -61,32 +63,39 @@ environment. Keep API keys out of shared config snippets and screenshots.
 
 ## Tools
 
-| Tool | What it does |
-| --- | --- |
-| `whoami` | Returns org, plan, key id, scopes. Always call first when troubleshooting. |
-| `list_endpoints` | Lists endpoints with optional platform / status / hostname-glob filtering. |
-| `find_alerts` | Searches alerts by severity / ack state / since / hostname / MITRE technique. |
-| `list_events` | Lists audit/block telemetry events, including last-day event review workflows. |
-| `triage_alert` | Fetches one alert with process chain + evidence; optionally acknowledges or dismisses it. |
-| `list_policies` | Lists policies with current version + mode. |
-| `show_policy` | Shows one policy by id. |
-| `manage_policy_rules` | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
-| `apply_policy_to_endpoints` | Resolves endpoints by id list or hostname-glob and assigns a policy. |
-| `flip_to_enforcing` | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical. |
-| `list_customer_intel_feeds` | Lists private intel feeds or feed items. |
-| `manage_customer_intel_feed` | Creates, updates, or deletes private intel feeds. |
-| `manage_customer_intel_item` | Edits or deletes one private intel feed item. |
-| `upsert_customer_intel_items` | Adds indicators extracted from reports into a private feed. |
-| `manage_policy_intel_sources` | Lists, attaches, or detaches intel feeds on a policy. |
-| `upgrade_endpoints` | Queues agent upgrades for one endpoint, a selected list, a platform, or hostname-glob results. |
-| `request_endpoint_checkin` | Queues an endpoint check-in command. |
-| `mint_enrollment_token` | Mints a one-time agent enrollment token. |
-| `agent_install_instructions` | Returns the install one-liner for macOS / Linux / Windows. No API call. |
+| Tool                          | What it does                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `whoami`                      | Returns organization, key id, and scopes. Always call first when troubleshooting.                                             |
+| `list_endpoints`              | Lists endpoints with optional platform / status / hostname-glob filtering.                                                     |
+| `show_endpoint`               | Fetches one endpoint with OS, policy, compliance, upgrade, heartbeat, and AMSI details.                                        |
+| `list_agent_releases`         | Lists available agent versions and per-platform latest releases.                                                               |
+| `find_alerts`                 | Searches alerts by severity / ack state / since / hostname / MITRE technique.                                                  |
+| `list_events`                 | Lists audit/block telemetry events, including last-day event review workflows.                                                 |
+| `triage_alert`                | Fetches one alert directly with triggering events, metadata, and file context; optionally acknowledges or dismisses it.        |
+| `list_policies`               | Lists policies with current version + mode.                                                                                    |
+| `show_policy`                 | Shows one policy by id.                                                                                                        |
+| `manage_policy_rules`         | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
+| `apply_policy_to_endpoints`   | Resolves endpoints by id list or hostname-glob and assigns a policy.                                                           |
+| `flip_to_enforcing`           | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical.                                    |
+| `list_customer_intel_feeds`   | Lists private intel feeds or feed items.                                                                                       |
+| `manage_customer_intel_feed`  | Creates, updates, or deletes private intel feeds.                                                                              |
+| `manage_customer_intel_item`  | Edits or deletes one private intel feed item.                                                                                  |
+| `upsert_customer_intel_items` | Adds indicators extracted from reports into a private feed.                                                                    |
+| `manage_policy_intel_sources` | Lists, attaches, or detaches intel feeds on a policy.                                                                          |
+| `upgrade_endpoints`           | Queues agent upgrades for one endpoint, a selected list, a platform, or hostname-glob results.                                 |
+| `request_endpoint_checkin`    | Queues an endpoint check-in command.                                                                                           |
+| `mint_enrollment_token`       | Mints a one-time agent enrollment token.                                                                                       |
+| `agent_install_instructions`  | Returns the install one-liner for macOS / Linux / Windows. No API call.                                                        |
 
 Write tools require matching Customer API scopes in Magic Portal, such as
 `alerts:write`, `policies:write`, `endpoints:write`, or `intel:write`.
 Event review uses `alerts:read`; turning selected events into policy rules
 uses `policies:write`.
+
+Tools publish standard MCP safety annotations. Read-only discovery tools are
+marked read-only and idempotent; enforcement, deletion, policy assignment,
+rule changes, and agent upgrades are marked destructive so MCP clients can
+apply appropriate confirmation UX.
 
 ## Example transcript
 
@@ -119,6 +128,11 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
 2. `~/.magicsword/mcp.json` (or `$MAGICSWORD_CONFIG`).
 3. Default base URL `https://www.magicsword.io`.
 
+Optional transport controls are `MAGICSWORD_REQUEST_TIMEOUT_MS` (default
+30 seconds), `MAGICSWORD_RESPONSE_MAX_BYTES` (default 4 MiB), and
+`MAGICSWORD_GET_RETRIES` (default 2, maximum 3). Only idempotent GET requests
+are retried; write actions are never retried automatically.
+
 ## Safety notes
 
 - **`flip_to_enforcing` is two-step.** The first call returns a server preview
@@ -133,6 +147,9 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
   process; the API key is read from `~/.magicsword/mcp.json` (mode 600) or
   an env var passed by the MCP host. Nothing is sent off-machine except
   the requests to the configured `MAGICSWORD_BASE_URL`.
+- **Remote Portal URLs must use HTTPS.** Plain HTTP is accepted only for
+  localhost development. Configured URLs cannot contain credentials, paths,
+  query strings, or fragments.
 
 ## Develop
 
@@ -143,6 +160,7 @@ npm test
 node dist/index.js --version
 ```
 
-The smoke test validates `--help`, `--version`, configure validation, secret
-redaction in setup output, MCP tool registration, policy status / enforcement
-handler behavior, and npm pack contents.
+Tests validate `--help`, `--version`, configure validation, secret redaction,
+MCP tool registration, policy status/enforcement behavior, retry and timeout
+semantics, response-size bounds, malformed responses, write non-retry behavior,
+and npm pack contents. See `docs/RELEASING.md` for the trusted npm release flow.

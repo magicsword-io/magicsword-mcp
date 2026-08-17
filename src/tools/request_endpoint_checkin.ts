@@ -6,7 +6,7 @@ export const requestEndpointCheckinTool = defineTool({
   title: 'Request endpoint check-in',
   description: 'Queues a check-in command for one endpoint. Requires endpoints:write.',
   inputSchema: {
-    endpoint_id: z.string().min(1).describe('Endpoint UUID'),
+    endpoint_id: z.string().uuid().describe('Endpoint UUID'),
   },
   async handler({ endpoint_id }, { client }) {
     try {

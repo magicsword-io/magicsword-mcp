@@ -1,9 +1,15 @@
-import { mkdirSync, writeFileSync, chmodSync, readFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir, platform } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { configPath, DEFAULT_BASE_URL, isValidMagicSwordApiKey, type MagicSwordConfig } from './config.js';
+import {
+  configPath,
+  DEFAULT_BASE_URL,
+  isValidMagicSwordApiKey,
+  normalizeBaseUrl,
+  type StoredMagicSwordConfig,
+} from './config.js';
 
 interface ConfigureOptions {
   apiKey?: string;
@@ -47,17 +53,22 @@ function claudeDesktopConfigPath(): string {
   return join(homedir(), '.config', 'Claude', 'claude_desktop_config.json');
 }
 
-function writeConfig(cfg: MagicSwordConfig): string {
+function writeConfig(cfg: StoredMagicSwordConfig): string {
   const target = configPath();
-  mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, `${JSON.stringify(cfg, null, 2)}\n`, { encoding: 'utf8' });
-  // Best-effort: on POSIX, restrict the file to the user since it contains a secret.
-  if (platform() !== 'win32') {
-    try {
+  mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+  const temporary = `${target}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporary, `${JSON.stringify(cfg, null, 2)}\n`, {
+      encoding: 'utf8',
+      flag: 'wx',
+      mode: 0o600,
+    });
+    renameSync(temporary, target);
+    if (platform() !== 'win32') {
       chmodSync(target, 0o600);
-    } catch {
-      // non-fatal
     }
+  } finally {
+    rmSync(temporary, { force: true });
   }
   return target;
 }
@@ -82,7 +93,7 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
   let existingApiKey: string | undefined;
   let existingBaseUrl: string | undefined;
   try {
-    const existing = JSON.parse(readFileSync(configPath(), 'utf8')) as Partial<MagicSwordConfig>;
+    const existing = JSON.parse(readFileSync(configPath(), 'utf8')) as Partial<StoredMagicSwordConfig>;
     existingApiKey = existing.apiKey;
     existingBaseUrl = existing.baseUrl;
   } catch {
@@ -114,14 +125,23 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
     process.exit(2);
   }
 
-  const cfg: MagicSwordConfig = { apiKey, baseUrl: baseUrl || DEFAULT_BASE_URL };
+  let normalizedBaseUrl: string;
+  try {
+    normalizedBaseUrl = normalizeBaseUrl(baseUrl || DEFAULT_BASE_URL);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(2);
+  }
+
+  const cfg: StoredMagicSwordConfig = {
+    apiKey: apiKey.trim(),
+    baseUrl: normalizedBaseUrl,
+  };
   const path = writeConfig(cfg);
 
   process.stdout.write(`\nWrote ${path} (mode 600)\n\n`);
   process.stdout.write('Add this block to your Claude Desktop config:\n');
   process.stdout.write(`  ${claudeDesktopConfigPath()}\n\n`);
   process.stdout.write(`${snippetForClaudeDesktop()}\n\n`);
-  process.stdout.write(
-    'Then restart Claude Desktop. The MCP server will appear as "magicsword" with 19 tools.\n',
-  );
+  process.stdout.write('Then restart Claude Desktop. The MCP server will appear as "magicsword" with 21 tools.\n');
 }

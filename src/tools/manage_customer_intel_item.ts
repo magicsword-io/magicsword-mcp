@@ -4,13 +4,14 @@ import { defineTool, formatApiError, textError, textOk } from './shared.js';
 export const manageCustomerIntelItemTool = defineTool({
   name: 'manage_customer_intel_item',
   title: 'Edit or delete a private intel feed item',
-  description:
-    'Edits or deletes one item in a private intelligence feed. Requires intel:write.',
+  description: 'Edits or deletes one item in a private intelligence feed. Requires intel:write.',
   inputSchema: {
     action: z.enum(['update', 'delete']),
-    feed_id: z.string().min(1),
-    item_id: z.string().min(1),
-    item: z.record(z.unknown()).optional()
+    feed_id: z.string().uuid(),
+    item_id: z.string().uuid(),
+    item: z
+      .record(z.unknown())
+      .optional()
       .describe('Replacement/merge fields for update. Supported fields match upsert_customer_intel_items.'),
   },
   async handler({ action, feed_id, item_id, item }, { client }) {

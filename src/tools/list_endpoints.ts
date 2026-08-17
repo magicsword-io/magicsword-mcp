@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { defineTool, formatApiError, globToRegex, textOk } from './shared.js';
-import type { Endpoint } from '../types.js';
+import { defineTool, formatApiError, textOk } from './shared.js';
 
 export const listEndpointsTool = defineTool({
   name: 'list_endpoints',
@@ -8,35 +7,37 @@ export const listEndpointsTool = defineTool({
   description:
     'Lists endpoints (devices) enrolled in the MagicSword org. ' +
     'Filter by platform (windows/macos/linux), status, or hostname pattern (glob: "*", "?"). ' +
-    'Hostname filtering is performed client-side after fetching the page from the API. ' +
+    'All filters run server-side before pagination. ' +
     'Returns up to `limit` endpoints (default 100, max 500). Use this to find endpoint IDs for other tools.',
   inputSchema: {
-    platform: z.enum(['windows', 'macos', 'linux']).optional()
-      .describe('Filter by OS platform'),
-    status: z.string().optional()
-      .describe('Filter by endpoint status (e.g. "online", "offline", "uninstalled")'),
-    hostname_pattern: z.string().optional()
+    platform: z.enum(['windows', 'macos', 'linux']).optional().describe('Filter by OS platform'),
+    status: z
+      .enum(['active', 'inactive', 'disabled', 'uninstalled'])
+      .optional()
+      .describe('Filter by endpoint lifecycle status'),
+    hostname_pattern: z
+      .string()
+      .min(1)
+      .max(255)
+      .optional()
       .describe('Glob pattern matched case-insensitively against computer_name (e.g. "prod-*", "win-?-db")'),
-    limit: z.number().int().min(1).max(500).optional()
-      .describe('Page size (default 100, max 500). Hostname-filtering is applied AFTER paging.'),
-    offset: z.number().int().min(0).optional()
-      .describe('Skip this many records before returning (for paging)'),
+    limit: z.number().int().min(1).max(500).optional().describe('Page size (default 100, max 500)'),
+    offset: z.number().int().min(0).optional().describe('Skip this many records before returning (for paging)'),
   },
   async handler({ platform, status, hostname_pattern, limit, offset }, { client }) {
     try {
-      const page = await client.endpoints({ platform, status, limit, offset });
-      let endpoints: Endpoint[] = page.endpoints;
-      let filteredNote = '';
-      if (hostname_pattern) {
-        const re = globToRegex(hostname_pattern);
-        const before = endpoints.length;
-        endpoints = endpoints.filter((e) => e.computer_name && re.test(e.computer_name));
-        filteredNote = ` (client-side hostname_pattern filter kept ${endpoints.length}/${before})`;
-      }
+      const page = await client.endpoints({
+        platform,
+        status,
+        hostname_pattern,
+        limit,
+        offset,
+      });
+      const endpoints = page.endpoints;
       const summary =
         endpoints.length === 0
-          ? `No endpoints matched on this page (server returned ${page.total} total endpoints in the org${filteredNote}).`
-          : `Showing ${endpoints.length} of ${page.total} total${filteredNote}.\n\n` +
+          ? `No endpoints matched this page. The filtered result set contains ${page.total} endpoint(s).`
+          : `Showing ${endpoints.length} of ${page.total} filtered endpoint(s).\n\n` +
             endpoints
               .map((e) => {
                 const lastSeen = e.last_checkin ?? e.last_heartbeat ?? 'never';
@@ -45,6 +46,7 @@ export const listEndpointsTool = defineTool({
                   `    id: ${e.id}`,
                   `    status: ${e.status ?? '(unknown)'} / compliance: ${e.compliance_status ?? '(unknown)'}`,
                   `    policy_id: ${e.policy_id ?? '(none)'}  installer: ${e.installer_version ?? '(unknown)'}`,
+                  `    update: ${e.update_status ?? '(none)'}  target: ${e.update_target_version ?? '(none)'}`,
                   `    last_seen: ${lastSeen}`,
                 ].join('\n');
               })

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineTool, formatApiError, globToRegex, textError, textOk } from './shared.js';
+import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 export const upgradeEndpointsTool = defineTool({
   name: 'upgrade_endpoints',
@@ -7,16 +7,35 @@ export const upgradeEndpointsTool = defineTool({
   description:
     'Queues agent upgrades for one endpoint, explicit endpoint IDs, all endpoints on a platform, or endpoints matching a hostname glob. Requires endpoints:write.',
   inputSchema: {
-    endpoint_id: z.string().optional().describe('Single endpoint UUID'),
-    endpoint_ids: z.array(z.string().min(1)).optional().describe('Explicit endpoint UUIDs'),
-    hostname_pattern: z.string().optional().describe('Optional hostname glob resolved client-side'),
+    endpoint_id: z.string().uuid().optional().describe('Single endpoint UUID'),
+    endpoint_ids: z.array(z.string().uuid()).min(1).max(500).optional().describe('Explicit endpoint UUIDs'),
+    hostname_pattern: z.string().min(1).max(255).optional().describe('Optional hostname glob resolved server-side'),
     platform: z.enum(['windows', 'macos', 'linux']).optional().describe('Optional platform filter'),
-    target_version: z.string().optional().describe('Target version, or latest by default'),
+    target_version: z.string().min(1).max(100).optional().describe('Target version, or latest by default'),
     update_all_outdated: z.boolean().optional().describe('Skip endpoints already on the target version'),
     limit: z.number().int().min(1).max(500).optional().describe('Max endpoints to resolve for filters'),
   },
-  async handler({ endpoint_id, endpoint_ids, hostname_pattern, platform, target_version, update_all_outdated, limit }, { client }) {
+  async handler(
+    { endpoint_id, endpoint_ids, hostname_pattern, platform, target_version, update_all_outdated, limit },
+    { client },
+  ) {
     try {
+      const selectors = [
+        Boolean(endpoint_id),
+        Boolean(endpoint_ids?.length),
+        Boolean(hostname_pattern),
+        Boolean(platform),
+      ];
+      if (selectors.filter(Boolean).length === 0) {
+        return textError('Provide endpoint_id, endpoint_ids, hostname_pattern, or platform.');
+      }
+      if (endpoint_id && selectors.filter(Boolean).length > 1) {
+        return textError('endpoint_id cannot be combined with other endpoint selectors.');
+      }
+      if (endpoint_ids?.length && (hostname_pattern || platform)) {
+        return textError('endpoint_ids cannot be combined with hostname_pattern or platform.');
+      }
+
       if (endpoint_id) {
         const result = await client.upgradeEndpoint(endpoint_id, target_version ?? 'latest');
         return textOk(`Queued upgrade for endpoint ${endpoint_id}.`, result as Record<string, unknown>);
@@ -24,19 +43,24 @@ export const upgradeEndpointsTool = defineTool({
 
       let ids = endpoint_ids ?? [];
       if (hostname_pattern) {
-        const re = globToRegex(hostname_pattern);
-        const page = await client.endpoints({ platform, limit: limit ?? 500 });
-        ids = page.endpoints.filter((endpoint) => endpoint.computer_name && re.test(endpoint.computer_name)).map((endpoint) => endpoint.id);
+        const page = await client.endpoints({
+          platform,
+          hostname_pattern,
+          limit: limit ?? 500,
+        });
+        if (page.total > page.endpoints.length) {
+          return textError(
+            `Hostname pattern matched ${page.total} endpoints but only ${page.endpoints.length} fit the requested limit. ` +
+              'Increase limit up to 500 or narrow the pattern; no upgrades were queued.',
+          );
+        }
+        ids = page.endpoints.map((endpoint) => endpoint.id);
         if (ids.length === 0) {
           return textOk(
             `No endpoints matched hostname_pattern "${hostname_pattern}"${platform ? ` on ${platform}` : ''}. No upgrades were queued.`,
             { results: [], queued: 0, skipped: 0, failed: 0 },
           );
         }
-      }
-
-      if (ids.length === 0 && !platform) {
-        return textError('Provide endpoint_id, endpoint_ids, hostname_pattern, or platform.');
       }
 
       const result = await client.bulkUpgradeEndpoints({
