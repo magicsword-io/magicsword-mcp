@@ -6,7 +6,7 @@ export const applyPolicyToEndpointsTool = defineTool({
   title: 'Assign a policy to endpoints',
   description:
     'Resolves either an explicit endpoint_ids list or a hostname_pattern (glob) into a concrete set of endpoints, ' +
-    'then assigns the named policy to them via the MagicSword Customer API.',
+    'then previews the concrete assignment. Rerun with confirm=true after human approval to apply it.',
   inputSchema: {
     policy_id: z.string().uuid().describe('The policy UUID to assign'),
     endpoint_ids: z
@@ -25,8 +25,9 @@ export const applyPolicyToEndpointsTool = defineTool({
       .enum(['windows', 'macos', 'linux'])
       .optional()
       .describe('Optional platform filter, applied when resolving hostname_pattern'),
+    confirm: z.boolean().optional().describe('Set true only after a human approves the resolved preview'),
   },
-  async handler({ policy_id, endpoint_ids, hostname_pattern, platform }, { client }) {
+  async handler({ policy_id, endpoint_ids, hostname_pattern, platform, confirm }, { client }) {
     if (!endpoint_ids?.length && !hostname_pattern) {
       return textError('Must supply either endpoint_ids or hostname_pattern.');
     }
@@ -77,6 +78,14 @@ export const applyPolicyToEndpointsTool = defineTool({
       }
 
       const list = targetEndpoints.map((e) => `  - ${e.computer_name ?? '(no name)'}  ${e.id}`).join('\n');
+
+      if (confirm !== true) {
+        return textOk(
+          `PREVIEW — would assign policy ${policy_id} (${policy.platform}) to ${targetEndpoints.length} endpoint(s):\n${list}\n` +
+            'No changes were made. Re-run with confirm=true after human approval.',
+          { policy_id, would_assign: targetEndpoints, requires_confirmation: true },
+        );
+      }
 
       const response = await client.assignPolicyToEndpoints(
         policy_id,

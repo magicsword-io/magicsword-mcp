@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 const intelItemSchema = z
-  .record(z.unknown())
+  .record(z.string(), z.unknown())
   .describe(
     'One indicator. Supported fields include filename/file_name, filepath/file_path/path, AuthentiHash/authentihash, pagehash/page_file_hash, and tbs_hash with publisher. hash/file_hash can be stored for IOC correlation when that is all a report provides, but do not use flat file hashes as Windows WDAC policy rules.',
   );

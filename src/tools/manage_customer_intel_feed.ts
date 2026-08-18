@@ -15,8 +15,9 @@ export const manageCustomerIntelFeedTool = defineTool({
     description: z.string().max(4096).optional().describe('Optional feed description'),
     platforms: z.array(platformSchema).optional().describe('Platforms this feed applies to'),
     is_enabled: z.boolean().optional().describe('Enable/disable matching for this feed'),
+    confirm: z.boolean().optional().describe('Required for delete after a human approves the preview'),
   },
-  async handler({ action, feed_id, name, description, platforms, is_enabled }, { client }) {
+  async handler({ action, feed_id, name, description, platforms, is_enabled, confirm }, { client }) {
     try {
       if (action === 'create') {
         if (!name) return textError('name is required when action=create.');
@@ -30,6 +31,13 @@ export const manageCustomerIntelFeedTool = defineTool({
       }
       if (!feed_id) return textError(`feed_id is required when action=${action}.`);
       if (action === 'delete') {
+        if (confirm !== true) {
+          return textOk(
+            `PREVIEW — would delete private intel feed ${feed_id}. No changes were made. ` +
+              'Re-run with confirm=true after human approval.',
+            { feed_id, would_delete: true, requires_confirmation: true },
+          );
+        }
         const result = await client.deleteIntelFeed(feed_id);
         return textOk(`Deleted private intel feed ${feed_id}.`, result as Record<string, unknown>);
       }

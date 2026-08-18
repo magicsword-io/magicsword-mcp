@@ -19,7 +19,7 @@ import { upgradeEndpointsTool } from './upgrade_endpoints.js';
 import { requestEndpointCheckinTool } from './request_endpoint_checkin.js';
 import { showEndpointTool } from './show_endpoint.js';
 import { listAgentReleasesTool } from './list_agent_releases.js';
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 
 export const allTools = [
   whoamiTool,

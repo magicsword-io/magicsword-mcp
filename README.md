@@ -16,16 +16,16 @@ the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
 ## Install
 
-### From npm (after the first release)
+### From npm
 
 ```sh
 npm install -g @magicsword-io/magicsword-mcp
 ```
 
-Requires Node 22+. The package is not published yet; the repository includes
-an OIDC trusted-publishing workflow for the first production release. Homebrew,
-winget, and curl packaging can follow once signed release artifacts and
-checksums are available.
+Requires Node 22+. After publication, MCP clients that consume the official
+Registry can discover this server as
+`io.github.magicsword-io/magicsword-mcp`. Homebrew, winget, and curl packaging
+can follow if demand justifies maintaining signed platform artifacts.
 
 ## Configure
 
@@ -75,14 +75,14 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
 | `show_policy`                 | Shows one policy by id.                                                                                                        |
 | `manage_policy_rules`         | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
-| `apply_policy_to_endpoints`   | Resolves endpoints by id list or hostname-glob and assigns a policy.                                                           |
+| `apply_policy_to_endpoints`   | Resolves endpoints and previews a policy assignment; `confirm=true` applies it after approval.                                |
 | `flip_to_enforcing`           | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical.                                    |
 | `list_customer_intel_feeds`   | Lists private intel feeds or feed items.                                                                                       |
-| `manage_customer_intel_feed`  | Creates, updates, or deletes private intel feeds.                                                                              |
-| `manage_customer_intel_item`  | Edits or deletes one private intel feed item.                                                                                  |
+| `manage_customer_intel_feed`  | Creates or updates feeds; deletion requires a preview followed by `confirm=true`.                                              |
+| `manage_customer_intel_item`  | Edits feed items; deletion requires a preview followed by `confirm=true`.                                                      |
 | `upsert_customer_intel_items` | Adds indicators extracted from reports into a private feed.                                                                    |
 | `manage_policy_intel_sources` | Lists, attaches, or detaches intel feeds on a policy.                                                                          |
-| `upgrade_endpoints`           | Queues agent upgrades for one endpoint, a selected list, a platform, or hostname-glob results.                                 |
+| `upgrade_endpoints`           | Previews upgrades for an endpoint selection; `confirm=true` queues them after approval.                                        |
 | `request_endpoint_checkin`    | Queues an endpoint check-in command.                                                                                           |
 | `mint_enrollment_token`       | Mints a one-time agent enrollment token.                                                                                       |
 | `agent_install_instructions`  | Returns the install one-liner for macOS / Linux / Windows. No API call.                                                        |
@@ -138,6 +138,9 @@ are retried; write actions are never retried automatically.
 - **`flip_to_enforcing` is two-step.** The first call returns a server preview
   and one-time confirmation token; you must show the preview to a human and
   pass the token back to commit. Tokens are short-lived and single-use.
+- **Fleet changes and deletion are explicit.** Endpoint upgrades, policy
+  assignments, and private-intel deletion return a no-op preview unless the
+  approved follow-up call includes `confirm=true`.
 - **Windows WDAC policy edits should not use explicit flat file hashes.**
   Use `manage_policy_rules` with `event_ids` when approving audit events so
   the Portal can derive supported path / publisher / filename rules, or use
@@ -161,6 +164,6 @@ node dist/index.js --version
 ```
 
 Tests validate `--help`, `--version`, configure validation, secret redaction,
-MCP tool registration, policy status/enforcement behavior, retry and timeout
+modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-and npm pack contents. See `docs/RELEASING.md` for the trusted npm release flow.
+and npm pack contents. See `docs/RELEASING.md` for npm and MCP Registry releases.

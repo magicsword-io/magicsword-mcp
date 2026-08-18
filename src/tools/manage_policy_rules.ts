@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
 const ruleSchema = z
-  .record(z.unknown())
+  .record(z.string(), z.unknown())
   .describe(
     'Policy rule. Common Windows WDAC shapes: {type:"filepath", value:"%OSDRIVE%\\\\Tools\\\\tool.exe", status:"blocked"}, {type:"filename", value:"tool.exe", status:"blocked"}, or {type:"publisher", value:{publisherName, signerName, tbsHash}, status:"allowed"}. Do not create explicit type:"hash" rules for Windows WDAC; use event_ids or private intel feeds for hash/AuthentiHash/page-hash IOCs.',
   );

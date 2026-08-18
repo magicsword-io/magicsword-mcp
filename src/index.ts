@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { z } from 'zod';
 import { MagicSwordClient } from './client.js';
 import { loadConfig } from './config.js';
 import { runConfigure } from './configure.js';
@@ -45,6 +46,34 @@ function printHelp(): void {
   );
 }
 
+function createServer(client: MagicSwordClient): McpServer {
+  const server = new McpServer(
+    { name: 'magicsword-mcp', version: VERSION },
+    {
+      instructions:
+        'MagicSword MCP exposes EDR management as conversational tools. Start with `whoami` to confirm the organization, key, and scopes. ' +
+        'Use `find_alerts`, `triage_alert`, and `list_events` for triage; `list_endpoints` then `show_endpoint` to inspect a fleet; `list_agent_releases` before upgrades; `upsert_customer_intel_items` to load report IOCs; and `manage_policy_rules` to add approved rules. ' +
+        'For Windows WDAC, do not create explicit flat file-hash policy rules; use event_ids so the Portal can derive supported rules, or use private intel feeds for hash/AuthentiHash/page-hash/TBS IOCs. ' +
+        'Fleet-wide and destructive operations require an explicit confirmation; show the preview to the human first.',
+    },
+  );
+
+  for (const tool of allTools) {
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: z.object(tool.inputSchema),
+        annotations: annotationsForTool(tool.name),
+      },
+      async (args: Record<string, unknown>) => tool.handler(args as never, { client }),
+    );
+  }
+
+  return server;
+}
+
 async function startServer(): Promise<void> {
   const config = loadConfig();
   const client = new MagicSwordClient({
@@ -56,42 +85,13 @@ async function startServer(): Promise<void> {
     getRetries: config.getRetries,
   });
 
-  const server = new McpServer(
-    { name: 'magicsword-mcp', version: VERSION },
-    {
-      instructions:
-        'MagicSword MCP exposes EDR management as conversational tools. Start with `whoami` to confirm the organization, key, and scopes. ' +
-        'Use `find_alerts`, `triage_alert`, and `list_events` for triage; `list_endpoints` then `show_endpoint` to inspect a fleet; `list_agent_releases` before upgrades; `upsert_customer_intel_items` to load report IOCs; and `manage_policy_rules` to add approved rules. ' +
-        'For Windows WDAC, do not create explicit flat file-hash policy rules; use event_ids so the Portal can derive supported rules, or use private intel feeds for hash/AuthentiHash/page-hash/TBS IOCs. ' +
-        'Destructive operations (`flip_to_enforcing`) require a two-step preview/confirm; never call them without showing ' +
-        'the preview to the human first.',
-    },
-  );
-
-  for (const tool of allTools) {
-    server.registerTool(
-      tool.name,
-      {
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        annotations: annotationsForTool(tool.name),
-      },
-      async (args: Record<string, unknown>) => {
-        const result = await tool.handler(args as never, { client });
-        return result;
-      },
-    );
-  }
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const handle = serveStdio(() => createServer(client));
 
   // Stay alive on SIGTERM/SIGINT so the host can request graceful shutdown.
   const shutdown = async (signal: string): Promise<void> => {
     process.stderr.write(`magicsword-mcp: received ${signal}, shutting down\n`);
     try {
-      await server.close();
+      await handle.close();
     } finally {
       process.exit(0);
     }

@@ -5,7 +5,8 @@ export const upgradeEndpointsTool = defineTool({
   name: 'upgrade_endpoints',
   title: 'Queue MagicSword agent upgrades',
   description:
-    'Queues agent upgrades for one endpoint, explicit endpoint IDs, all endpoints on a platform, or endpoints matching a hostname glob. Requires endpoints:write.',
+    'Previews or queues agent upgrades for one endpoint, explicit endpoint IDs, all endpoints on a platform, or endpoints matching a hostname glob. ' +
+    'The first call previews the request; rerun with confirm=true after human approval. Requires endpoints:write.',
   inputSchema: {
     endpoint_id: z.string().uuid().optional().describe('Single endpoint UUID'),
     endpoint_ids: z.array(z.string().uuid()).min(1).max(500).optional().describe('Explicit endpoint UUIDs'),
@@ -14,9 +15,10 @@ export const upgradeEndpointsTool = defineTool({
     target_version: z.string().min(1).max(100).optional().describe('Target version, or latest by default'),
     update_all_outdated: z.boolean().optional().describe('Skip endpoints already on the target version'),
     limit: z.number().int().min(1).max(500).optional().describe('Max endpoints to resolve for filters'),
+    confirm: z.boolean().optional().describe('Set true only after a human approves the preview'),
   },
   async handler(
-    { endpoint_id, endpoint_ids, hostname_pattern, platform, target_version, update_all_outdated, limit },
+    { endpoint_id, endpoint_ids, hostname_pattern, platform, target_version, update_all_outdated, limit, confirm },
     { client },
   ) {
     try {
@@ -34,6 +36,15 @@ export const upgradeEndpointsTool = defineTool({
       }
       if (endpoint_ids?.length && (hostname_pattern || platform)) {
         return textError('endpoint_ids cannot be combined with hostname_pattern or platform.');
+      }
+
+      if (confirm !== true) {
+        return textOk('PREVIEW — no upgrades were queued. Re-run with confirm=true after human approval.', {
+          requires_confirmation: true,
+          selector: { endpoint_id, endpoint_ids, hostname_pattern, platform, limit },
+          target_version: target_version ?? 'latest',
+          update_all_outdated: update_all_outdated ?? true,
+        });
       }
 
       if (endpoint_id) {

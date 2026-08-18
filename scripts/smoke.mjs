@@ -3,8 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 const root = process.cwd();
 const bin = join(root, 'dist', 'index.js');
@@ -40,8 +40,11 @@ const version = runNode(['--version']);
 assert(version.status === 0, `--version failed: ${version.stderr}`);
 assert(/^magicsword-mcp \d+\.\d+\.\d+/.test(version.stdout), '--version did not print package version');
 
-async function smokeMcpServer() {
-  const client = new Client({ name: 'magicsword-mcp-smoke', version: '1.0.0' });
+async function smokeMcpServer(mode) {
+  const client = new Client(
+    { name: `magicsword-mcp-smoke-${mode}`, version: '1.0.0' },
+    { versionNegotiation: { mode } },
+  );
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [bin],
@@ -54,6 +57,12 @@ async function smokeMcpServer() {
   });
   await client.connect(transport);
   try {
+    const protocolVersion = client.getNegotiatedProtocolVersion();
+    if (mode === 'auto') {
+      assert(protocolVersion === '2026-07-28', `modern MCP negotiation selected ${protocolVersion}`);
+    } else {
+      assert(protocolVersion !== '2026-07-28', 'legacy MCP negotiation unexpectedly selected the modern protocol');
+    }
     const listed = await client.listTools();
     const toolNames = listed.tools.map((tool) => tool.name);
     for (const required of [
@@ -79,7 +88,8 @@ async function smokeMcpServer() {
   }
 }
 
-await smokeMcpServer();
+await smokeMcpServer('auto');
+await smokeMcpServer('legacy');
 
 async function smokeToolHandlers() {
   const [
@@ -91,6 +101,10 @@ async function smokeToolHandlers() {
     { triageAlertTool },
     { listEndpointsTool },
     { listEventsTool },
+    { applyPolicyToEndpointsTool },
+    { upgradeEndpointsTool },
+    { manageCustomerIntelFeedTool },
+    { manageCustomerIntelItemTool },
   ] = await Promise.all([
     import(pathToFileURL(join(root, 'dist', 'tools', 'list_policies.js')).href),
     import(pathToFileURL(join(root, 'dist', 'tools', 'show_policy.js')).href),
@@ -100,6 +114,10 @@ async function smokeToolHandlers() {
     import(pathToFileURL(join(root, 'dist', 'tools', 'triage_alert.js')).href),
     import(pathToFileURL(join(root, 'dist', 'tools', 'list_endpoints.js')).href),
     import(pathToFileURL(join(root, 'dist', 'tools', 'list_events.js')).href),
+    import(pathToFileURL(join(root, 'dist', 'tools', 'apply_policy_to_endpoints.js')).href),
+    import(pathToFileURL(join(root, 'dist', 'tools', 'upgrade_endpoints.js')).href),
+    import(pathToFileURL(join(root, 'dist', 'tools', 'manage_customer_intel_feed.js')).href),
+    import(pathToFileURL(join(root, 'dist', 'tools', 'manage_customer_intel_item.js')).href),
   ]);
 
   const policy = {
@@ -238,6 +256,22 @@ async function smokeToolHandlers() {
         since: '2026-01-01T00:00:00Z',
       };
     },
+    async assignPolicyToEndpoints(policyId, endpointIds) {
+      calls.push(['assignPolicyToEndpoints', policyId, endpointIds]);
+      return { assigned: endpointIds.length };
+    },
+    async upgradeEndpoint(requestedEndpointId, targetVersion) {
+      calls.push(['upgradeEndpoint', requestedEndpointId, targetVersion]);
+      return { queued: true };
+    },
+    async deleteIntelFeed(feedId) {
+      calls.push(['deleteIntelFeed', feedId]);
+      return { deleted: true };
+    },
+    async deleteIntelFeedItem(feedId, itemId) {
+      calls.push(['deleteIntelFeedItem', feedId, itemId]);
+      return { deleted: true };
+    },
   };
 
   const listed = await listPoliciesTool.handler({}, { client: fakeClient });
@@ -337,6 +371,57 @@ async function smokeToolHandlers() {
     calls.some((call) => call[0] === 'endpoints' && call[1].hostname_pattern === 'prod-*'),
     'list_endpoints did not pass the server-side hostname filter',
   );
+
+  const policyPreview = await applyPolicyToEndpointsTool.handler(
+    { policy_id: policy.id, endpoint_ids: [endpointId] },
+    { client: fakeClient },
+  );
+  assert(policyPreview.content[0].text.includes('PREVIEW'), 'policy assignment did not preview before mutation');
+  assert(
+    !calls.some((call) => call[0] === 'assignPolicyToEndpoints'),
+    'policy assignment mutated without confirm=true',
+  );
+  await applyPolicyToEndpointsTool.handler(
+    { policy_id: policy.id, endpoint_ids: [endpointId], confirm: true },
+    { client: fakeClient },
+  );
+  assert(
+    calls.some((call) => call[0] === 'assignPolicyToEndpoints'),
+    'policy assignment did not mutate with confirm=true',
+  );
+
+  const upgradePreview = await upgradeEndpointsTool.handler(
+    { endpoint_id: endpointId },
+    { client: fakeClient },
+  );
+  assert(upgradePreview.content[0].text.includes('PREVIEW'), 'endpoint upgrade did not preview before mutation');
+  assert(!calls.some((call) => call[0] === 'upgradeEndpoint'), 'endpoint upgrade mutated without confirm=true');
+  await upgradeEndpointsTool.handler(
+    { endpoint_id: endpointId, confirm: true },
+    { client: fakeClient },
+  );
+  assert(calls.some((call) => call[0] === 'upgradeEndpoint'), 'endpoint upgrade did not mutate with confirm=true');
+
+  const feedId = '00000000-0000-4000-8000-000000000501';
+  const itemId = '00000000-0000-4000-8000-000000000502';
+  await manageCustomerIntelFeedTool.handler({ action: 'delete', feed_id: feedId }, { client: fakeClient });
+  assert(!calls.some((call) => call[0] === 'deleteIntelFeed'), 'feed deletion mutated without confirm=true');
+  await manageCustomerIntelFeedTool.handler(
+    { action: 'delete', feed_id: feedId, confirm: true },
+    { client: fakeClient },
+  );
+  assert(calls.some((call) => call[0] === 'deleteIntelFeed'), 'feed deletion did not mutate with confirm=true');
+
+  await manageCustomerIntelItemTool.handler(
+    { action: 'delete', feed_id: feedId, item_id: itemId },
+    { client: fakeClient },
+  );
+  assert(!calls.some((call) => call[0] === 'deleteIntelFeedItem'), 'item deletion mutated without confirm=true');
+  await manageCustomerIntelItemTool.handler(
+    { action: 'delete', feed_id: feedId, item_id: itemId, confirm: true },
+    { client: fakeClient },
+  );
+  assert(calls.some((call) => call[0] === 'deleteIntelFeedItem'), 'item deletion did not mutate with confirm=true');
 }
 
 await smokeToolHandlers();
