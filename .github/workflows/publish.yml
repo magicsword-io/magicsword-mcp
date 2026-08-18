@@ -1,0 +1,82 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish-npm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release tag matches package version
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(node -p "require('./package.json').version")"
+          test "$(node -p "require('./package.json').version")" = "$(node -p "require('./server.json').version")"
+
+      - name: Test package
+        run: npm test
+
+      - name: Publish with npm trusted publishing
+        run: npm publish --access public
+
+  publish-registry:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Verify Registry metadata version
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(node -p "require('./server.json').version")"
+
+      - name: Wait for npm package availability
+        env:
+          PACKAGE_NAME: '@magicsword-io/magicsword-mcp'
+          PACKAGE_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          version="${PACKAGE_VERSION#v}"
+          for attempt in {1..12}; do
+            npm view "${PACKAGE_NAME}@${version}" version && exit 0
+            sleep 5
+          done
+          exit 1
+
+      - name: Install MCP Registry publisher
+        env:
+          MCP_PUBLISHER_VERSION: '1.8.1'
+          MCP_PUBLISHER_SHA256: 'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc'
+        run: |
+          curl -fsSL \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            -o mcp-publisher.tar.gz
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum --check
+          tar -xzf mcp-publisher.tar.gz
+
+      - name: Publish to the official MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish server.json

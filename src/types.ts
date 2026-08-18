@@ -1,0 +1,236 @@
+// Shared response shapes that mirror the Magic Portal /api/public/v1/* JSON.
+// Defined here (rather than imported from the portal) so the MCP server stays
+// a standalone binary with no monorepo coupling.
+
+export type ApiScope =
+  | 'policies:read'
+  | 'policies:write'
+  | 'alerts:read'
+  | 'alerts:write'
+  | 'endpoints:read'
+  | 'endpoints:write'
+  | 'intel:read'
+  | 'intel:write'
+  | 'tokens:write';
+
+export type Platform = 'windows' | 'macos' | 'linux';
+
+export interface Org {
+  id: string;
+  name?: string;
+  organization_type?: string;
+}
+
+export interface MeResponse {
+  org: Org;
+  key_id: string;
+  scopes: ApiScope[];
+}
+
+export interface Endpoint {
+  id: string;
+  computer_name: string | null;
+  platform: Platform | string;
+  status: string | null;
+  compliance_status: string | null;
+  installer_version: string | null;
+  os_version?: string | null;
+  architecture?: string | null;
+  policy_id: string | null;
+  macos_policy_id?: string | null;
+  desired_policy_ids?: string[] | null;
+  last_checkin: string | null;
+  last_heartbeat: string | null;
+  update_status?: string | null;
+  update_target_version?: string | null;
+  update_started_at?: string | null;
+  update_error_code?: string | null;
+  amsi_enabled?: boolean | null;
+  amsi_rules_version?: string | null;
+  amsi_detection_count?: number | null;
+  last_amsi_detection_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+  uninstalled_at: string | null;
+  uninstall_reason?: string | null;
+}
+
+export interface EndpointsResponse {
+  endpoints: Endpoint[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface EndpointDetailResponse {
+  endpoint: Endpoint;
+}
+
+export interface PolicyVersion {
+  id: string;
+  policy_id: string;
+  name: string | null;
+  version: number | string;
+  status?: 'disabled' | 'audit' | 'enforcing' | string | null;
+  policy_mode: 'blocklist' | 'strict' | string;
+  change_message: string | null;
+  updated_at: string;
+}
+
+export interface Policy {
+  id: string;
+  platform: Platform | string;
+  current_version: PolicyVersion | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PoliciesResponse {
+  policies: Policy[];
+}
+
+export interface PolicyDetailResponse {
+  policy: Policy;
+}
+
+export interface EventRow {
+  id: string;
+  type: string;
+  name: string;
+  status: 'audited' | 'blocked' | 'allowed' | string;
+  platform?: Platform | string | null;
+  computer_name?: string | null;
+  endpoint_id?: string | null;
+  file_name?: string | null;
+  file_path?: string | null;
+  file_hash?: string | null;
+  publisher?: string | null;
+  certificate_thumbprint?: string | null;
+  is_signed?: boolean | null;
+  package_family_name?: string | null;
+  intel_match_count?: number | null;
+  intel_match_sources?: string[] | null;
+  linked_policy_ids?: string[] | null;
+  occurrence_count?: number | string | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  rule_context?: Record<string, Record<string, string>>;
+}
+
+export interface EventsResponse {
+  events: EventRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  since: string;
+}
+
+export interface Alert {
+  id: string;
+  alert_type?: string | null;
+  endpoint_id?: string | null;
+  endpoint_name?: string | null;
+  endpoint_names?: string[] | null;
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'info' | string | null;
+  title?: string | null;
+  description?: string | null;
+  user_name?: string | null;
+  triggering_event_id?: string | null;
+  triggering_events?: unknown[] | null;
+  event_count?: number | null;
+  time_window_minutes?: number | null;
+  rule_type?: string | null;
+  file_path?: string | null;
+  file_hash?: string | null;
+  publisher?: string | null;
+  intel_source_id?: string | null;
+  intel_source_name?: string | null;
+  metadata?: Record<string, unknown> | null;
+  mitre_techniques?: string[] | null;
+  acknowledged_at?: string | null;
+  acknowledged_by?: string | null;
+  dismissed_at?: string | null;
+  triage_status?: string | null;
+  superseded_by_alert_id?: string | null;
+  created_at: string;
+  [key: string]: unknown;
+}
+
+export interface AlertsResponse {
+  alerts: Alert[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AlertDetailResponse {
+  alert: Alert;
+}
+
+export interface AgentRelease {
+  id: string;
+  version: string;
+  release_notes?: string | null;
+  min_upgrade_version?: string | null;
+  is_latest?: boolean;
+  is_latest_windows?: boolean;
+  is_latest_macos?: boolean;
+  is_latest_linux?: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AgentReleasesResponse {
+  releases: AgentRelease[];
+}
+
+export interface EnrollmentTokenResponse {
+  token: string;
+  org_id: string;
+  expires_at: string;
+  ttl_seconds: number;
+}
+
+export interface CustomerIntelFeed {
+  id: string;
+  name: string;
+  description?: string | null;
+  platforms?: Platform[] | string[] | null;
+  is_enabled?: boolean;
+  item_count?: number | null;
+  entry_count?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomerIntelFeedsResponse {
+  feeds: CustomerIntelFeed[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CustomerIntelItem {
+  id: string;
+  source_id: string;
+  data: Record<string, unknown>;
+  entry_hash: string;
+  status?: string;
+  is_deleted?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CustomerIntelItemsResponse {
+  items: CustomerIntelItem[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ApiErrorBody {
+  error: string;
+  feature?: string;
+}
