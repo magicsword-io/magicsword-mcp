@@ -90,6 +90,7 @@ async function smokeToolHandlers() {
     { findAlertsTool },
     { triageAlertTool },
     { listEndpointsTool },
+    { listEventsTool },
   ] = await Promise.all([
     import(pathToFileURL(join(root, 'dist', 'tools', 'list_policies.js')).href),
     import(pathToFileURL(join(root, 'dist', 'tools', 'show_policy.js')).href),
@@ -98,6 +99,7 @@ async function smokeToolHandlers() {
     import(pathToFileURL(join(root, 'dist', 'tools', 'find_alerts.js')).href),
     import(pathToFileURL(join(root, 'dist', 'tools', 'triage_alert.js')).href),
     import(pathToFileURL(join(root, 'dist', 'tools', 'list_endpoints.js')).href),
+    import(pathToFileURL(join(root, 'dist', 'tools', 'list_events.js')).href),
   ]);
 
   const policy = {
@@ -118,6 +120,7 @@ async function smokeToolHandlers() {
   const calls = [];
   const endpointId = '00000000-0000-4000-8000-000000000201';
   const alertId = '00000000-0000-4000-8000-000000000301';
+  const eventId = '00000000-0000-4000-8000-000000000401';
   const fakeClient = {
     async policies() {
       return { policies: [policy] };
@@ -210,6 +213,31 @@ async function smokeToolHandlers() {
         offset: 0,
       };
     },
+    async events(query) {
+      calls.push(['events', query]);
+      return {
+        events: [
+          {
+            id: eventId,
+            type: 'browser_extension',
+            status: 'audited',
+            platform: 'windows',
+            name: 'Security Helper',
+            created_at: '2026-01-02T00:00:00Z',
+            rule_context: {
+              browser_extension: {
+                id: 'abcdefghijklmnop',
+                browser: 'chrome',
+              },
+            },
+          },
+        ],
+        total: 1,
+        limit: 100,
+        offset: 0,
+        since: '2026-01-01T00:00:00Z',
+      };
+    },
   };
 
   const listed = await listPoliciesTool.handler({}, { client: fakeClient });
@@ -261,6 +289,31 @@ async function smokeToolHandlers() {
       (call) => call[0] === 'addPolicyRules' && call[1].event_ids?.[0] === '00000000-0000-4000-8000-000000000103',
     ),
     'manage_policy_rules add handler did not pass event_ids to the API client',
+  );
+
+  const events = await listEventsTool.handler(
+    { hours: 24, status: 'audited' },
+    { client: fakeClient },
+  );
+  assert(events.structuredContent?.events?.[0]?.id === eventId, 'list_events omitted the event id');
+  assert(
+    events.structuredContent?.events?.[0]?.rule_context?.browser_extension?.id === 'abcdefghijklmnop',
+    'list_events omitted normalized rule context',
+  );
+  await managePolicyRulesTool.handler(
+    {
+      action: 'add',
+      policy_name: 'Workstations',
+      event_ids: [eventId],
+      status: 'allowed',
+    },
+    { client: fakeClient },
+  );
+  assert(
+    calls.some(
+      (call) => call[0] === 'addPolicyRules' && call[1].event_ids?.[0] === eventId,
+    ),
+    'list_events to manage_policy_rules workflow did not preserve the selected event id',
   );
 
   await findAlertsTool.handler({ hostname: 'prod-*', mitre_technique: 'T1059.001' }, { client: fakeClient });

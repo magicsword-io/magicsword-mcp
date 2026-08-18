@@ -5,7 +5,7 @@ export const listEventsTool = defineTool({
   name: 'list_events',
   title: 'List MagicSword audit/block events',
   description:
-    'Lists org telemetry events as JSON. Use this for requests like “show me the last day of audit events” or “find blocked events for this policy”. Requires alerts:read.',
+    'Lists normalized, rule-relevant org events as JSON without raw endpoint telemetry. Use this for requests like “show me the last day of audit events” or “find blocked events for this policy”. Requires alerts:read.',
   inputSchema: {
     hours: z
       .number()
@@ -28,11 +28,15 @@ export const listEventsTool = defineTool({
       const result = await client.events(args);
       const lines = result.events
         .slice(0, 50)
-        .map(
-          (event) =>
+        .map((event) => {
+          const ruleContext = event.rule_context
+            ? ` rule_context=${JSON.stringify(event.rule_context)}`
+            : '';
+          return (
             `- ${event.created_at ?? event.last_seen_at ?? ''} [${event.platform ?? '?'}] ${event.status}/${event.type} ` +
-            `${event.name ?? event.file_name ?? event.file_path ?? event.file_hash ?? event.id} id=${event.id}`,
-        );
+            `${event.name ?? event.file_name ?? event.file_path ?? event.file_hash ?? event.id} id=${event.id}${ruleContext}`
+          );
+        });
       return textOk(
         `Found ${result.total} event(s) since ${result.since}. Showing ${result.events.length}.\n\n${lines.join('\n')}`,
         result as unknown as Record<string, unknown>,

@@ -107,6 +107,7 @@ export interface EventRow {
   publisher?: string | null;
   certificate_thumbprint?: string | null;
   is_signed?: boolean | null;
+  package_family_name?: string | null;
   intel_match_count?: number | null;
   intel_match_sources?: string[] | null;
   linked_policy_ids?: string[] | null;
@@ -115,7 +116,7 @@ export interface EventRow {
   last_seen_at?: string | null;
   created_at?: string;
   updated_at?: string;
-  data?: Record<string, unknown>;
+  rule_context?: Record<string, Record<string, string>>;
 }
 
 export interface EventsResponse {
