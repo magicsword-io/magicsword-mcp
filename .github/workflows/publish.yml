@@ -88,9 +88,9 @@ jobs:
           PACKAGE_VERSION: ${{ github.event.release.tag_name }}
         run: |
           version="${PACKAGE_VERSION#v}"
-          for attempt in {1..12}; do
+          for attempt in {1..120}; do
             npm view "${PACKAGE_NAME}@${version}" version && exit 0
-            printf 'Waiting for npm availability (attempt %s/12)...\n' "$attempt"
+            printf 'Waiting for npm availability (attempt %s/120)...\n' "$attempt"
             sleep 5
           done
           exit 1
