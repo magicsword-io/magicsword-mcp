@@ -14,18 +14,109 @@ the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 > the server returns a clear "this MagicSword org needs the Enterprise plan
 > to use MCP" message; nothing else works until the org is upgraded.
 
-## Install
+## Quick start
 
-### From npm
+Requires **Node.js 22+**, an installed MCP client, and a MagicSword Enterprise
+API key from **Magic Portal → Settings → API Keys**.
+
+**Recommended: install and connect your client in one command.** Setup prompts
+for your key privately and lets you choose Claude Desktop, Codex, Claude Code,
+or Cursor:
 
 ```sh
-npm install -g @magicsword-io/magicsword-mcp
+npm install -g @magicsword-io/magicsword-mcp && magicsword-mcp configure
 ```
 
-Requires Node 22+. After publication, MCP clients that consume the official
-Registry can discover this server as
-`io.github.magicsword-io/magicsword-mcp`. Homebrew, winget, and curl packaging
-can follow if demand justifies maintaining signed platform artifacts.
+Already know your client? Run the matching one-liner:
+
+| Client | Install and configure |
+| --- | --- |
+| Claude Desktop | `npm install -g @magicsword-io/magicsword-mcp && magicsword-mcp configure --client claude-desktop` |
+| Cursor | `npm install -g @magicsword-io/magicsword-mcp && magicsword-mcp configure --client cursor` |
+| Claude Code | `npm install -g @magicsword-io/magicsword-mcp && magicsword-mcp configure --client claude-code` |
+| OpenAI Codex | `npm install -g @magicsword-io/magicsword-mcp && magicsword-mcp configure --client codex` |
+
+Prefer your client's own registration command? After saving your key locally,
+these also work without a global server install:
+
+```sh
+codex mcp add magicsword --env MAGICSWORD_BASE_URL=https://www.magicsword.io -- npx -y @magicsword-io/magicsword-mcp
+claude mcp add --scope user --transport stdio magicsword --env MAGICSWORD_BASE_URL=https://www.magicsword.io -- npx -y @magicsword-io/magicsword-mcp
+```
+
+These are also a fallback when automatic registration cannot launch a client's
+CLI on Windows. Desktop launch still requires Node/npx to be available to that
+client; the recommended setup uses absolute paths instead.
+
+### Install buttons: Cursor and VS Code
+
+**First save your API key locally** (once per machine):
+
+```sh
+npm install -g @magicsword-io/magicsword-mcp && magicsword-mcp configure --client manual
+```
+
+Then click your client's button and approve its installation prompt:
+
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=magicsword&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBtYWdpY3N3b3JkLWlvL21hZ2ljc3dvcmQtbWNwIl0sImVudiI6eyJNQUdJQ1NXT1JEX0JBU0VfVVJMIjoiaHR0cHM6Ly93d3cubWFnaWNzd29yZC5pbyJ9fQ%3D%3D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_MCP-0078d4?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=magicsword&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40magicsword-io%2Fmagicsword-mcp%22%5D%2C%22env%22%3A%7B%22MAGICSWORD_BASE_URL%22%3A%22https%3A%2F%2Fwww.magicsword.io%22%7D%7D)
+[![Install in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_MCP-24bfa5?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=magicsword&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40magicsword-io%2Fmagicsword-mcp%22%5D%2C%22env%22%3A%7B%22MAGICSWORD_BASE_URL%22%3A%22https%3A%2F%2Fwww.magicsword.io%22%7D%7D&quality=insiders)
+
+These buttons register a local `npx` server pointing at production. They contain
+no API key; the server reads `~/.magicsword/mcp.json`. They require `npx` on the
+client's PATH. If a desktop app cannot find Node or npx, use the recommended
+setup above for absolute launch paths, or copy the absolute `command` and
+`args` printed by `configure --client manual` into its configuration.
+
+### Manual JSON fallback
+
+After saving your key above, merge this entry into Claude Desktop's
+`claude_desktop_config.json` or Cursor's `~/.cursor/mcp.json`, preserving your
+other servers:
+
+```json
+{
+  "mcpServers": {
+    "magicsword": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@magicsword-io/magicsword-mcp"
+      ],
+      "env": {
+        "MAGICSWORD_BASE_URL": "https://www.magicsword.io"
+      }
+    }
+  }
+}
+```
+
+For **VS Code / Insiders**, run **MCP: Open User Configuration** and merge this
+configuration (VS Code uses `servers`, not `mcpServers`):
+
+```json
+{
+  "servers": {
+    "magicsword": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@magicsword-io/magicsword-mcp"
+      ],
+      "env": {
+        "MAGICSWORD_BASE_URL": "https://www.magicsword.io"
+      }
+    }
+  }
+}
+```
+
+Restart your client or start a new session, then ask it to call `whoami` and
+`list_endpoints`. Both must succeed to verify authentication and read access.
+
+The official MCP Registry identifier is
+`io.github.magicsword-io/magicsword-mcp`. Client-specific details follow below.
 
 ## Configure
 
@@ -33,29 +124,39 @@ can follow if demand justifies maintaining signed platform artifacts.
 magicsword-mcp configure
 ```
 
-You'll be prompted for an API key (mint one in **Magic Portal → Settings →
-API Keys**) and a portal base URL (defaults to `https://www.magicsword.io`).
-The command writes `~/.magicsword/mcp.json` (mode 600) and prints the exact
-JSON snippet to paste into Claude Desktop's config:
+Setup asks for an API key with hidden input (mint one in **Magic Portal →
+Settings → API Keys**) and which client to connect: Claude Desktop, Codex,
+Claude Code, Cursor, or manual configuration. It saves the key only in
+`~/.magicsword/mcp.json` (mode 600). The Portal defaults to
+`https://www.magicsword.io`, replacing any saved preview origin. A custom
+origin requires an explicit `--base-url` option.
 
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+Setup registers the selected client at its standard user-level location,
+preserves other servers and settings, and creates a private backup of existing
+client configuration. It updates an existing `magicsword` entry for JSON clients
+and Codex. Claude Code requires that name to be available; use its own MCP
+commands to remove an old registration before retrying. Codex and Claude Code
+registration require their respective CLIs to be installed.
 
-The snippet looks like this:
+To choose a client directly, or reuse a saved key without prompting:
 
-```json
-{
-  "mcpServers": {
-    "magicsword": {
-      "command": "magicsword-mcp"
-    }
-  }
-}
+```sh
+magicsword-mcp configure --client codex
+magicsword-mcp configure --non-interactive --client claude-desktop
+magicsword-mcp configure --client cursor --client-config /path/to/mcp.json
 ```
 
-Restart Claude Desktop and "magicsword" will appear with 21 tools. Logs are
-at `~/Library/Logs/Claude/mcp*.log` on macOS.
+The launch entry uses absolute Node and installed server paths so desktop apps
+can start it without inheriting your terminal's PATH. Re-run setup if you move
+your Node installation or install the package under a different Node version.
+Manual setup prints a credential-free launch entry for other local stdio MCP
+clients. Unattended setup without `--client` writes only the MagicSword file.
+
+Restart the selected client or start a new session to load `magicsword` and its
+21 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
+discovery alone does not verify API-key scopes. Claude Desktop logs are at
+`~/Library/Logs/Claude/mcp*.log` on macOS. Browser-only clients require a remote
+MCP transport; this package provides a local stdio server.
 
 If you need a per-client override instead of `~/.magicsword/mcp.json`, set
 `MAGICSWORD_API_KEY` and optionally `MAGICSWORD_BASE_URL` in that MCP host's
@@ -165,7 +266,8 @@ npm run release:verify
 node dist/index.js --version
 ```
 
-Tests validate `--help`, `--version`, configure validation, secret redaction,
+Tests validate `--help`, `--version`, production-default migration, private client
+registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
 and npm pack contents. `test:package` installs a production-only tarball and

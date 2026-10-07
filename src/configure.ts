@@ -1,147 +1,94 @@
-import { chmodSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { homedir, platform } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 import { stdin, stdout } from 'node:process';
-import {
-  configPath,
-  DEFAULT_BASE_URL,
-  isValidMagicSwordApiKey,
-  normalizeBaseUrl,
-  type StoredMagicSwordConfig,
-} from './config.js';
+import { configPath, DEFAULT_BASE_URL, isValidMagicSwordApiKey, normalizeBaseUrl, type StoredMagicSwordConfig } from './config.js';
+import { atomicPrivateWrite, CLIENTS, registerClient, serverDefinition, type SetupClient } from './client-setup.js';
 
 interface ConfigureOptions {
   apiKey?: string;
   baseUrl?: string;
   nonInteractive?: boolean;
+  client?: SetupClient;
+  clientConfig?: string;
 }
 
 function parseArgs(args: string[]): ConfigureOptions {
   const opts: ConfigureOptions = {};
   for (let i = 0; i < args.length; i += 1) {
     const a = args[i];
-    if (a === '--api-key' || a === '-k') opts.apiKey = args[++i];
-    else if (a === '--base-url' || a === '-u') opts.baseUrl = args[++i];
-    else if (a === '--non-interactive' || a === '-n') opts.nonInteractive = true;
+    if (a === '--non-interactive' || a === '-n') { opts.nonInteractive = true; continue; }
+    if (!['--api-key', '-k', '--base-url', '-u', '--client', '--client-config'].includes(a)) throw new Error('Unknown configure option. Run magicsword-mcp --help.');
+    const value = args[++i];
+    if (!value || value.startsWith('--')) throw new Error('Configure option requires a value.');
+    if (a === '--api-key' || a === '-k') opts.apiKey = value;
+    else if (a === '--base-url' || a === '-u') opts.baseUrl = value;
+    else if (a === '--client-config') opts.clientConfig = value;
+    else {
+      if (!(CLIENTS as readonly string[]).includes(value)) throw new Error(`Client must be one of: ${CLIENTS.join(', ')}.`);
+      opts.client = value as SetupClient;
+    }
   }
+  if (opts.clientConfig && opts.client !== 'claude-desktop' && opts.client !== 'cursor') throw new Error('--client-config requires --client claude-desktop or cursor.');
   return opts;
 }
 
-async function prompt(question: string, defaultValue?: string): Promise<string> {
-  const rl = createInterface({ input: stdin, output: stdout });
-  const suffix = defaultValue ? ` [${defaultValue}]` : '';
+async function prompt(question: string, hidden = false): Promise<string> {
+  stdout.write(`${question}: `);
+  const muted = new Writable({ write(_chunk, _encoding, callback) { callback(); } });
+  const rl = createInterface({ input: stdin, output: hidden ? muted : stdout, terminal: Boolean(stdin.isTTY) });
   try {
-    const answer = (await rl.question(`${question}${suffix}: `)).trim();
-    return answer || defaultValue || '';
-  } finally {
-    rl.close();
+    return (await new Promise<string>((resolve, reject) => {
+      rl.once('SIGINT', () => { reject(new Error('Setup cancelled.')); rl.close(); });
+      rl.once('close', () => reject(new Error('Setup cancelled.')));
+      rl.question('').then(resolve, reject);
+    })).trim();
   }
-}
-
-function claudeDesktopConfigPath(): string {
-  // macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-  // Linux: ~/.config/Claude/claude_desktop_config.json
-  // Windows: %APPDATA%\Claude\claude_desktop_config.json
-  const os = platform();
-  if (os === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
-  }
-  if (os === 'win32') {
-    return join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Claude', 'claude_desktop_config.json');
-  }
-  return join(homedir(), '.config', 'Claude', 'claude_desktop_config.json');
-}
-
-function writeConfig(cfg: StoredMagicSwordConfig): string {
-  const target = configPath();
-  mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-  const temporary = `${target}.${process.pid}.tmp`;
-  try {
-    writeFileSync(temporary, `${JSON.stringify(cfg, null, 2)}\n`, {
-      encoding: 'utf8',
-      flag: 'wx',
-      mode: 0o600,
-    });
-    renameSync(temporary, target);
-    if (platform() !== 'win32') {
-      chmodSync(target, 0o600);
-    }
-  } finally {
-    rmSync(temporary, { force: true });
-  }
-  return target;
-}
-
-function snippetForClaudeDesktop(): string {
-  return JSON.stringify(
-    {
-      mcpServers: {
-        magicsword: {
-          command: 'magicsword-mcp',
-        },
-      },
-    },
-    null,
-    2,
-  );
+  finally { rl.close(); muted.destroy(); if (hidden) stdout.write('\n'); }
 }
 
 export async function runConfigure(rawArgs: string[]): Promise<void> {
-  const opts = parseArgs(rawArgs);
-
-  let existingApiKey: string | undefined;
-  let existingBaseUrl: string | undefined;
   try {
-    const existing = JSON.parse(readFileSync(configPath(), 'utf8')) as Partial<StoredMagicSwordConfig>;
-    existingApiKey = existing.apiKey;
-    existingBaseUrl = existing.baseUrl;
-  } catch {
-    // first-time configure — fine
-  }
+    const opts = parseArgs(rawArgs);
+    let existingApiKey: string | undefined;
+    try {
+      const existing = JSON.parse(readFileSync(configPath(), 'utf8')) as Partial<StoredMagicSwordConfig>;
+      if (typeof existing?.apiKey === 'string') existingApiKey = existing.apiKey;
+    } catch { /* Missing credentials can be supplied below. */ }
 
-  let apiKey = opts.apiKey;
-  let baseUrl = opts.baseUrl;
+    let apiKey = opts.apiKey ?? process.env.MAGICSWORD_API_KEY;
+    let client = opts.client;
+    if (!opts.nonInteractive) {
+      if (!apiKey) {
+        if (!stdin.isTTY) throw new Error('Interactive setup requires a terminal. Use --non-interactive with MAGICSWORD_API_KEY instead.');
+        apiKey = await prompt(`MagicSword API key (hidden${existingApiKey ? '; Enter keeps saved key' : ''})`, true) || existingApiKey;
+      }
+      if (!client) {
+        stdout.write('\nWhere should MagicSword be connected?\n  1. Claude Desktop\n  2. Codex (app / CLI / IDE)\n  3. Claude Code\n  4. Cursor\n  5. Manual configuration\n');
+        const choice = await prompt('Choose 1–5');
+        const index = Number(choice) - 1;
+        if (!Number.isInteger(index) || index < 0 || index >= CLIENTS.length) throw new Error('Choose a client from 1 to 5, or use --client.');
+        client = CLIENTS[index];
+      }
+    } else apiKey ??= existingApiKey;
 
-  if (!opts.nonInteractive) {
-    if (!apiKey) {
-      const suffix = existingApiKey ? ` (press Enter to keep current ${existingApiKey.slice(0, 8)}...)` : '';
-      const answered = await prompt(`MagicSword API key${suffix}`);
-      apiKey = answered.trim() || existingApiKey;
+    if (!isValidMagicSwordApiKey(apiKey)) throw new Error('A valid MagicSword API key (starting with msk_) is required. Mint one in Magic Portal → Settings → API Keys.');
+    const baseUrl = normalizeBaseUrl(opts.baseUrl ?? DEFAULT_BASE_URL);
+    const path = configPath();
+    const cfg: StoredMagicSwordConfig = { apiKey: apiKey.trim(), baseUrl };
+    atomicPrivateWrite(path, `${JSON.stringify(cfg, null, 2)}\n`);
+    stdout.write(`\nSaved private MagicSword credentials to ${path} (mode 600).\n`);
+    if (!opts.baseUrl) stdout.write(`Portal: ${DEFAULT_BASE_URL}\n`);
+    const definition = serverDefinition(path, baseUrl);
+    const target = registerClient(client ?? 'manual', definition, opts.clientConfig);
+    if (target) {
+      stdout.write(`Registered magicsword with ${client} in ${target}.\nRestart the client or start a new session to load its 21 tools.\n`);
+    } else {
+      stdout.write('\nChoose --client claude-desktop, codex, claude-code, or cursor to register automatically.\nFor another local stdio MCP client, merge this entry into its configuration:\n');
+      stdout.write(`${JSON.stringify({ mcpServers: { magicsword: definition } }, null, 2)}\n`);
     }
-    if (!baseUrl) {
-      baseUrl = await prompt('Portal base URL', existingBaseUrl ?? DEFAULT_BASE_URL);
-    }
-  } else {
-    apiKey = apiKey ?? existingApiKey;
-    baseUrl = baseUrl ?? existingBaseUrl ?? DEFAULT_BASE_URL;
-  }
-
-  if (!isValidMagicSwordApiKey(apiKey)) {
-    process.stderr.write(
-      'A valid MagicSword API key (starting with msk_) is required.\n' +
-        'Mint one in Magic Portal → Settings → API Keys.\n',
-    );
-    process.exit(2);
-  }
-
-  let normalizedBaseUrl: string;
-  try {
-    normalizedBaseUrl = normalizeBaseUrl(baseUrl || DEFAULT_BASE_URL);
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(2);
+    process.stderr.write(`${error instanceof Error ? error.message : 'Setup failed.'}\n`);
+    process.exitCode = 2;
   }
-
-  const cfg: StoredMagicSwordConfig = {
-    apiKey: apiKey.trim(),
-    baseUrl: normalizedBaseUrl,
-  };
-  const path = writeConfig(cfg);
-
-  process.stdout.write(`\nWrote ${path} (mode 600)\n\n`);
-  process.stdout.write('Add this block to your Claude Desktop config:\n');
-  process.stdout.write(`  ${claudeDesktopConfigPath()}\n\n`);
-  process.stdout.write(`${snippetForClaudeDesktop()}\n\n`);
-  process.stdout.write('Then restart Claude Desktop. The MCP server will appear as "magicsword" with 21 tools.\n');
 }

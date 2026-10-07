@@ -450,8 +450,8 @@ try {
   assert(valid.status === 0, `configure failed: ${valid.stderr}`);
   assert(!valid.stdout.includes(fakeKey), 'configure printed the API key in stdout');
   assert(
-    valid.stdout.includes('"command": "magicsword-mcp"'),
-    'configure did not print Claude Desktop command snippet',
+    valid.stdout.includes(`"command": ${JSON.stringify(process.execPath)}`),
+    'configure did not print an absolute Node command snippet',
   );
 
   const cfg = JSON.parse(readFileSync(configPath, 'utf8'));
