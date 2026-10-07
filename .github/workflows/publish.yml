@@ -6,14 +6,31 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: public-release
+  cancel-in-progress: false
 
 jobs:
   publish-npm:
     runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify public repository and main ancestry
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          test "$GITHUB_REPOSITORY" = "magicsword-io/magicsword-mcp"
+          test "$REPOSITORY_PRIVATE" = "false"
+          git merge-base --is-ancestor HEAD origin/main
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -22,16 +39,26 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
+      - name: Pin npm CLI for trusted publishing
+        run: npm install --global npm@11.12.0
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify release tag matches package version
-        run: |
-          test "${GITHUB_REF_NAME}" = "v$(node -p "require('./package.json').version")"
-          test "$(node -p "require('./package.json').version")" = "$(node -p "require('./server.json').version")"
+      - name: Verify all release metadata
+        run: npm run release:verify -- "$GITHUB_REF_NAME"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Audit all dependencies
+        run: npm audit
 
       - name: Test package
         run: npm test
+
+      - name: Test installed production package
+        run: npm run test:package
 
       - name: Publish with npm trusted publishing
         run: npm publish --access public
@@ -39,6 +66,9 @@ jobs:
   publish-registry:
     needs: publish-npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -50,8 +80,7 @@ jobs:
           package-manager-cache: false
 
       - name: Verify Registry metadata version
-        run: |
-          test "${GITHUB_REF_NAME}" = "v$(node -p "require('./server.json').version")"
+        run: npm run release:verify -- "$GITHUB_REF_NAME"
 
       - name: Wait for npm package availability
         env:
@@ -61,6 +90,7 @@ jobs:
           version="${PACKAGE_VERSION#v}"
           for attempt in {1..12}; do
             npm view "${PACKAGE_NAME}@${version}" version && exit 0
+            printf 'Waiting for npm availability (attempt %s/12)...\n' "$attempt"
             sleep 5
           done
           exit 1

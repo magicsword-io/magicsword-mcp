@@ -36,6 +36,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Test installed production package
+        run: npm run test:package
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -54,5 +57,8 @@ jobs:
       - name: Run focused tests
         run: npm test
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
+      - name: Verify release metadata
+        run: npm run release:verify
+
+      - name: Audit all dependencies
+        run: npm audit
