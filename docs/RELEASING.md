@@ -112,8 +112,10 @@ then use the automated workflow normally.
 
 The workflow checks every version and identity, rejects private repositories
 and off-main commits, runs the full audit and installed production package
-check, then publishes npm. It waits for the package to be visible before
-publishing Registry metadata through GitHub OIDC. Release runs are serialized.
+check, then publishes npm. It waits up to ten minutes for npm processing to make
+the package visible before publishing Registry metadata through GitHub OIDC. If
+npm processing takes longer, wait for `npm view` to find the version and rerun
+only the failed Registry job. Release runs are serialized.
 Package smoke tests install a real temporary tarball; `npm publish` subsequently
 rebuilds via lifecycle hooks. The locally tested digest is candidate evidence,
 not proof that a particular tarball was published.
