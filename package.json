@@ -23,18 +23,22 @@
     "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
     "start": "node dist/index.js",
     "configure": "node dist/index.js configure",
-    "test": "npm run build && node scripts/client.mjs && node scripts/smoke.mjs",
+    "test": "npm run build && node --test scripts/verify-release.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
+    "test:package": "npm run build && node scripts/package-smoke.mjs",
+    "version": "node scripts/sync-registry-version.mjs",
+    "release:sync": "node scripts/sync-registry-version.mjs",
+    "release:verify": "node scripts/verify-release.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm run typecheck && npm test",
+    "prepublishOnly": "npm run typecheck && npm test && npm audit",
     "prepack": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "undici": "^7.29.0",
+    "undici": "^7.29.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/client": "^2.2.0",
     "@types/node": "^22.10.0",
     "typescript": "^5.6.3"
   },

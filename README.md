@@ -160,10 +160,14 @@ are retried; write actions are never retried automatically.
 npm install
 npm run build
 npm test
+npm run test:package
+npm run release:verify
 node dist/index.js --version
 ```
 
 Tests validate `--help`, `--version`, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-and npm pack contents. See `docs/RELEASING.md` for npm and MCP Registry releases.
+and npm pack contents. `test:package` installs a production-only tarball and
+checks the installed CLI and MCP tool discovery; `release:verify` checks all
+release metadata. See `docs/RELEASING.md` for npm and MCP Registry releases.
