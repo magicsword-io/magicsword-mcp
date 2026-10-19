@@ -23,7 +23,7 @@
     "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
     "start": "node dist/index.js",
     "configure": "node dist/index.js configure",
-    "test": "npm run build && node --test scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
+    "test": "npm run build && node --test scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs scripts/policy-rules.test.mjs scripts/policy-rules-stdio.test.mjs scripts/tools-stdio.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
     "test:package": "npm run build && node scripts/package-smoke.mjs",
     "version": "node scripts/sync-registry-version.mjs",
     "release:sync": "node scripts/sync-registry-version.mjs",

@@ -168,6 +168,8 @@ async function smokeToolHandlers() {
       calls.push(['addPolicyRules', body]);
       return {
         added_count: body.event_ids?.length ?? body.rules?.length ?? 0,
+        updated_count: 0,
+        duplicate_count: 0,
         version: 8,
       };
     },

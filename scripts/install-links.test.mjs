@@ -28,6 +28,8 @@ test('public install buttons decode to production stdio launch entries without c
 });
 
 test('manual fallback examples use the respective client schemas and the same safe launch entry', () => {
-  const examples = [...readme.matchAll(/```json\n([\s\S]*?)\n```/g)].map(([, body]) => JSON.parse(body));
+  const manualFallback = readme.split('### Manual JSON fallback\n')[1]?.split('## Configure\n')[0];
+  assert.ok(manualFallback, 'README is missing the manual JSON fallback section');
+  const examples = [...manualFallback.matchAll(/```json\n([\s\S]*?)\n```/g)].map(([, body]) => JSON.parse(body));
   assert.deepEqual(examples, [{mcpServers: {magicsword: entry}}, {servers: {magicsword: {type: 'stdio', ...entry}}}]);
 });
