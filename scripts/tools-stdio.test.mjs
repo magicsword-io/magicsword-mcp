@@ -121,7 +121,10 @@ for (const mode of ['auto', 'legacy']) {
       assert.equal((await call('manage_customer_intel_item', { action: 'delete', feed_id: feedId, item_id: itemId })).structuredContent.requires_confirmation, true);
       await call('manage_customer_intel_item', { action: 'delete', feed_id: feedId, item_id: itemId, confirm: true }, [write('DELETE', `/intel/feeds/${feedId}/items/${itemId}`, undefined)]);
       await call('manage_policy_intel_sources', { action: 'list', policy_id: policyId }, [get(`/policies/${policyId}/intel-sources`, { sources: [] })]);
-      await call('manage_policy_intel_sources', { action: 'attach', policy_id: policyId, source_ids: [feedId] }, [write('POST', `/policies/${policyId}/intel-sources`, { source_ids: [feedId] })]);
+      await call('manage_policy_intel_sources', { action: 'attach', policy_id: policyId, source_ids: [feedId] }, [write('POST', `/policies/${policyId}/intel-sources`, { source_ids: [feedId] }, { success: true, result: { sourcesAttached: 1, skippedAlreadyAttached: 0 } })]);
+      const unchangedSources = await call('manage_policy_intel_sources', { action: 'attach', policy_id: policyId, source_ids: [feedId] }, [write('POST', `/policies/${policyId}/intel-sources`, { source_ids: [feedId] }, { success: true, result: { sourcesAttached: 0, skippedAlreadyAttached: 1 } })]);
+      assert.match(unchangedSources.content[0].text, /No changes needed: 1 intel source\(s\) already attached/);
+      await call('manage_policy_intel_sources', { action: 'attach', policy_id: policyId, source_ids: [feedId] }, [write('POST', `/policies/${policyId}/intel-sources`, { source_ids: [feedId] }, {})], true);
       await call('manage_policy_intel_sources', { action: 'detach', policy_id: policyId, source_id: feedId }, [write('DELETE', `/policies/${policyId}/intel-sources/${feedId}`, undefined)]);
       await call('manage_customer_intel_feed', { action: 'delete', feed_id: feedId, confirm: true }, [write('DELETE', `/intel/feeds/${feedId}`, undefined)]);
       assert.equal((await call('upgrade_endpoints', { endpoint_id: endpointId })).structuredContent.requires_confirmation, true);

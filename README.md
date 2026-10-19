@@ -304,9 +304,13 @@ are retried; write actions are never retried automatically.
   perform both calls. The MCP host must obtain human approval before committing.
   A commit response must confirm success for the requested policy and identify
   its new version; otherwise use `show_policy` to verify the outcome before retrying.
+  Success confirms the server policy version change. Endpoint enforcement takes
+  effect through check-in; this response does not confirm endpoint delivery.
 - **Intel attachments use enabled sources in batches of at most 60.** Capture
   requests share the API key creator's rate budget with the Portal UI. A 429
   response includes retry guidance; wait before submitting another batch.
+  Attachment summaries report newly attached and already-attached counts
+  separately. Invalid or incomplete counts require listing attachments before retrying.
 - **Fleet changes and deletion are explicit.** Endpoint upgrades, policy
   assignments, and private-intel deletion return a no-op preview unless the
   approved follow-up call includes `confirm=true`.
