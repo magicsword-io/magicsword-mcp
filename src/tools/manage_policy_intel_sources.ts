@@ -9,7 +9,7 @@ export const managePolicyIntelSourcesTool = defineTool({
   inputSchema: {
     action: z.enum(['list', 'attach', 'detach']),
     policy_id: z.string().uuid(),
-    source_ids: z.array(z.string().uuid()).min(1).max(100).optional().describe('One or more source IDs for attach'),
+    source_ids: z.array(z.string().uuid()).min(1).max(60).optional().describe('1–60 enabled source IDs for attach; captures share the key creator\'s rate budget'),
     source_id: z.string().uuid().optional().describe('Source ID for detach'),
   },
   async handler({ action, policy_id, source_ids, source_id }, { client }) {

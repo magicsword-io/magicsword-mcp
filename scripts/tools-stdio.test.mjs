@@ -99,7 +99,14 @@ for (const mode of ['auto', 'legacy']) {
       await call('apply_policy_to_endpoints', { ...assignment, confirm: true }, [get('/policies', { policies: [policy] }), write('POST', `/policies/${policyId}/assign-endpoints`, { endpoint_ids: [endpointId] })]);
       const enforcement = await call('flip_to_enforcing', { policy_id: policyId }, [write('POST', `/policies/${policyId}/enforce-preview`, { acknowledge_blockers: false }, { can_enforce: true, preflight: { endpoint_count: 1 }, confirmation: { token: 'test-confirm-token', expires_at: '2026-10-19T01:00:00Z' }, blockers: [] })]);
       assert.match(enforcement.content[0].text, /test-confirm-token/);
-      await call('flip_to_enforcing', { policy_id: policyId, confirmation_token: 'test-confirm-token' }, [write('POST', `/policies/${policyId}/enforce`, { confirmation_token: 'test-confirm-token' })]);
+      await call('flip_to_enforcing', { policy_id: policyId, confirmation_token: 'test-confirm-token' }, [write('POST', `/policies/${policyId}/enforce`, { confirmation_token: 'test-confirm-token' }, { ok: true, policy_id: policyId, new_version_id: id(103) })]);
+      for (const response of [{}, { ok: false }, { ok: true, policy_id: id(999), new_version_id: id(103) }]) {
+        const invalid = await call('flip_to_enforcing', { policy_id: policyId, confirmation_token: 'test-confirm-token' }, [write('POST', `/policies/${policyId}/enforce`, { confirmation_token: 'test-confirm-token' }, response)], true);
+        assert.match(invalid.content[0].text, /show_policy/);
+      }
+      const partialEvents = await call('manage_policy_rules', { action: 'add', policy_id: policyId, event_ids: [eventId, id(402), id(403)] }, [write('POST', `/policies/${policyId}/rules`, { policy_id: policyId, event_ids: [eventId, id(402), id(403)] }, { added_count: 1, updated_count: 0, duplicate_count: 0, version: 9 })], true);
+      assert.match(partialEvents.content[0].text, /1 of 3 unique events/);
+      assert.equal(partialEvents.structuredContent.version, 9);
       const feed = { id: feedId, name: 'Fixture feed', item_count: 1 };
       await call('list_customer_intel_feeds', { limit: 1 }, [get('/intel/feeds', page('feeds', feed), { limit: '1' })]);
       await call('list_customer_intel_feeds', { feed_id: feedId, limit: 1 }, [get(`/intel/feeds/${feedId}/items`, page('items', { id: itemId, data: { filename: 'fixture.exe' } }), { limit: '1' })]);

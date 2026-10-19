@@ -77,6 +77,16 @@ export const managePolicyRulesTool = defineTool({
           structuredContent: result as Record<string, unknown>,
         };
       }
+      if (event_ids) {
+        const requestedEvents = new Set(event_ids).size;
+        const accountedEvents = added + updated + duplicates;
+        if (accountedEvents < requestedEvents) {
+          return {
+            ...textError(`The Portal accounted for only ${accountedEvents} of ${requestedEvents} unique events in its rule-change counts. Some events may not have produced rules, and some rules may already have been saved. List the current rules and inspect the policy version before retrying.`),
+            structuredContent: result as Record<string, unknown>,
+          };
+        }
+      }
       const summary = added === 0 && updated === 0
         ? `No changes needed: ${duplicates} rule(s) already exist with the same status.`
         : `Updated policy rules: added ${added}, updated ${updated}, already unchanged ${duplicates}.`;

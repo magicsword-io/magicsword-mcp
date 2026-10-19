@@ -243,6 +243,9 @@ information in structured output. An unchanged duplicate batch reports “No
 changes needed.” Unexplained zero changes or malformed responses are errors:
 inspect the current rules/version before retrying because the request may have
 created a version. Writes are never retried automatically.
+For event-derived batches, a count total smaller than the number of unique
+requested events is also an error: some events may not have produced rules.
+Successful changes and version details remain available in structured output.
 
 To verify the current version's stored rules:
 
@@ -297,6 +300,13 @@ are retried; write actions are never retried automatically.
 - **`flip_to_enforcing` is two-step.** The first call returns a server preview
   and one-time confirmation token; you must show the preview to a human and
   pass the token back to commit. Tokens are short-lived and single-use.
+  This is **not MFA or server-verified human approval**: the same API key can
+  perform both calls. The MCP host must obtain human approval before committing.
+  A commit response must confirm success for the requested policy and identify
+  its new version; otherwise use `show_policy` to verify the outcome before retrying.
+- **Intel attachments use enabled sources in batches of at most 60.** Capture
+  requests share the API key creator's rate budget with the Portal UI. A 429
+  response includes retry guidance; wait before submitting another batch.
 - **Fleet changes and deletion are explicit.** Endpoint upgrades, policy
   assignments, and private-intel deletion return a no-op preview unless the
   approved follow-up call includes `confirm=true`.

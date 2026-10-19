@@ -132,3 +132,28 @@ test('RULES-03 requires each reported count and explains a verified zero-change 
   assert.match(result.content[0].text, /0 rules added and 0 updated/);
   assert.equal(result.structuredContent.added_count, 0);
 });
+
+test('RULES-03 flags partially derived events without retrying a write or hiding version details', async () => {
+  const event_ids = [event_id, '00000000-0000-4000-8000-000000000402', '00000000-0000-4000-8000-000000000403'];
+  const response = { added_count: 1, updated_count: 0, duplicate_count: 0, version: 9 };
+  let calls = 0;
+  const result = await tool.handler({ action: 'add', policy_id, event_ids }, {
+    client: { async addPolicyRules() { calls++; return response; } },
+  });
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, /1 of 3 unique events/);
+  assert.match(result.content[0].text, /before retrying/);
+  assert.equal(result.structuredContent, response);
+  assert.equal(calls, 1);
+});
+
+test('RULES-03 accepts complete event accounting including repeated event IDs and unchanged rules', async () => {
+  const result = await invoke({ action: 'add', policy_id, event_ids: [event_id, event_id] }, {
+    added_count: 0, updated_count: 0, duplicate_count: 1,
+  });
+  assert.ok(!result.isError);
+  const mixed = await invoke({ action: 'add', policy_id, event_ids: [event_id, '00000000-0000-4000-8000-000000000402'] }, {
+    added_count: 1, updated_count: 1, duplicate_count: 0,
+  });
+  assert.ok(!mixed.isError);
+});
