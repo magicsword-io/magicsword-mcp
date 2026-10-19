@@ -2,6 +2,12 @@ import { z } from 'zod';
 import { MagicSwordApiError } from '../client.js';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
+const enforcementResultSchema = z.object({
+  ok: z.literal(true),
+  policy_id: z.string().uuid(),
+  new_version_id: z.string().uuid(),
+}).passthrough();
+
 function renderPreview(policyId: string, preview: Record<string, unknown>): ReturnType<typeof textOk> {
   const confirmation = preview.confirmation as { token?: string; expires_at?: string } | undefined;
   const blockers = Array.isArray(preview.blockers) ? (preview.blockers as string[]) : [];
@@ -47,7 +53,8 @@ export const flipToEnforcingTool = defineTool({
   description:
     'Promotes a MagicSword policy from audit to enforcing mode through the Portal server confirmation flow. ' +
     'First call without confirmation_token to get readiness, blockers, endpoint count, and a one-time token. ' +
-    'Show the preview to the human. Second call with confirmation_token to commit. Requires policies:write.',
+    'Show the preview to the human. Second call with confirmation_token to commit. Requires policies:write. ' +
+    'This is two-step API confirmation, not MFA: the same API key can perform both calls. Human approval must be obtained by the MCP host.',
   inputSchema: {
     policy_id: z.string().uuid().describe('Policy UUID to flip'),
     acknowledge_blockers: z
@@ -65,6 +72,10 @@ export const flipToEnforcingTool = defineTool({
     try {
       if (confirmation_token) {
         const result = await client.enforcePolicy(policy_id, confirmation_token);
+        const parsed = enforcementResultSchema.safeParse(result);
+        if (!parsed.success || parsed.data.policy_id !== policy_id) {
+          return textError('The Portal returned an invalid enforcement response; the outcome could not be verified. Use show_policy to verify the current status and version before retrying; the policy may already be enforcing.');
+        }
         return textOk(`Policy ${policy_id} was flipped to enforcing.`, result as Record<string, unknown>);
       }
 

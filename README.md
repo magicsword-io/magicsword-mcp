@@ -198,6 +198,67 @@ marked read-only and idempotent; enforcement, deletion, policy assignment,
 rule changes, and agent upgrades are marked destructive so MCP clients can
 apply appropriate confirmation UX.
 
+## Adding and listing policy rules
+
+`manage_policy_rules` accepts **one** input source per add: `rules` for explicit
+rules, or `event_ids` for rules derived from telemetry. Each accepts 1–100 items.
+Use `policy_id`, or `policy_name` with an optional `platform` to resolve a name.
+The policy must already exist; ambiguous names require an ID or platform.
+
+For example, to block the filenames from issue #5 on a Windows blocklist policy:
+
+```json
+{
+  "action": "add",
+  "policy_name": "Workstations",
+  "platform": "windows",
+  "rules": [
+    { "type": "filename", "value": "rustdesk.exe", "status": "blocked" },
+    { "type": "filename", "value": "mshta.exe", "status": "blocked" },
+    { "type": "filename", "value": "wscript.exe", "status": "blocked" }
+  ]
+}
+```
+
+Explicit rules use `type` and `value`, with optional `status` (defaults to
+`blocked`). Unknown rule fields are rejected; `rule_type` / `file_name` are not
+substitutes. Filename and path values must be non-empty strings or supported
+value objects. Publisher values require `publisherName` (or `publisher`) and a
+valid `tbsHash` (or `tbs_hash` / `certificate_thumbprint`). Optional rule metadata
+includes `name`, `mode`, version bounds, signer/file-attribute references,
+`package_version`, and `target_platforms`. The Portal validates whether a rule
+can be enforced on the resolved policy's platform. Flat Windows WDAC hashes
+remain unsupported; use telemetry-derived rules or private intelligence feeds.
+
+For telemetry, use `event_ids` with top-level `status` (defaults to `allowed`)
+and an optional `type` override. Top-level `status` and `type` cannot be used
+with explicit `rules`; set those fields on each rule instead.
+
+Adds preserve existing rules and intelligence-source links. Matching customer
+rules with a different status are updated; rules already at the requested status
+are reported as unchanged duplicates. Feed-owned rules retain their provenance;
+unsupported conflicts with a feed rule return an API error. The tool reports
+the Portal's actual `added_count`, `updated_count`, and `duplicate_count`, and retains its version
+information in structured output. An unchanged duplicate batch reports “No
+changes needed.” Unexplained zero changes or malformed responses are errors:
+inspect the current rules/version before retrying because the request may have
+created a version. Writes are never retried automatically.
+For event-derived batches, a count total smaller than the number of unique
+requested events is also an error: some events may not have produced rules.
+Successful changes and version details remain available in structured output.
+
+To verify the current version's stored rules:
+
+```json
+{ "action": "list", "policy_id": "<policy UUID>", "limit": 500, "offset": 0 }
+```
+
+List requires an ID and `policies:read`. It returns stored customer rules and
+materialized feed rules for the current version, with `total`, `limit`, and
+`offset`. The default page size is 100, maximum 500; increase `offset` until all
+`total` rows have been read. An empty page does not describe other versions or
+indicators that have not been materialized into this version.
+
 ## Example transcript
 
 ```
@@ -239,6 +300,17 @@ are retried; write actions are never retried automatically.
 - **`flip_to_enforcing` is two-step.** The first call returns a server preview
   and one-time confirmation token; you must show the preview to a human and
   pass the token back to commit. Tokens are short-lived and single-use.
+  This is **not MFA or server-verified human approval**: the same API key can
+  perform both calls. The MCP host must obtain human approval before committing.
+  A commit response must confirm success for the requested policy and identify
+  its new version; otherwise use `show_policy` to verify the outcome before retrying.
+  Success confirms the server policy version change. Endpoint enforcement takes
+  effect through check-in; this response does not confirm endpoint delivery.
+- **Intel attachments use enabled sources in batches of at most 60.** Capture
+  requests share the API key creator's rate budget with the Portal UI. A 429
+  response includes retry guidance; wait before submitting another batch.
+  Attachment summaries report newly attached and already-attached counts
+  separately. Invalid or incomplete counts require listing attachments before retrying.
 - **Fleet changes and deletion are explicit.** Endpoint upgrades, policy
   assignments, and private-intel deletion return a no-op preview unless the
   approved follow-up call includes `confirm=true`.
@@ -270,6 +342,37 @@ Tests validate `--help`, `--version`, production-default migration, private clie
 registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-and npm pack contents. `test:package` installs a production-only tarball and
+all 21 tools' HTTP contracts and confirmation flows over modern and legacy
+stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
+actual mutation counts, and npm pack
+contents. `test:package` installs a production-only tarball and
 checks the installed CLI and MCP tool discovery; `release:verify` checks all
 release metadata. See `docs/RELEASING.md` for npm and MCP Registry releases.
+
+An opt-in live policy test is also available after `npm run build`:
+
+```sh
+MAGICSWORD_LIVE_TEST=1 MAGICSWORD_TEST_POLICY_ID="<disposable-policy-uuid>" node scripts/live-policy-rules.mjs
+```
+
+Use your private saved credentials or `MAGICSWORD_API_KEY`; do not put keys in
+commands or shared logs. This test **writes policy versions** and requires a
+disposable, unassigned Windows audit policy named with the prefix
+`MCP issue 5 disposable verification`, seeded with more than 1,000 baseline rules
+with at least one attached intelligence source, and no existing `rustdesk.exe`,
+`mshta.exe`, or `wscript.exe` customer rules.
+It verifies append behavior, pagination, intelligence-source preservation,
+repeat adds, status updates, invalid inputs, and event-derived filenames when
+suitable telemetry exists. It also exercises discovery and read tools through
+stdio. It prints assertion names/counts only. Remove the disposable policy and
+its versions after inspection; the test does not create or delete the fixture.
+Set `MAGICSWORD_TEST_PROTOCOL=legacy` to exercise the legacy live transport.
+
+With the same disposable policy and opt-in environment, run
+`node scripts/live-demo-tools.mjs` to check assignment, upgrade, and enforcement
+previews, all three platforms' installer instructions, and a disabled temporary
+feed's create/update/upsert/list/item-delete/attach/detach/feed-delete flows.
+The feed is removed in `finally`; the policy fixture still requires manual
+cleanup. These checks never commit endpoint assignments, upgrades, or enforcement.
+Actual endpoint commands, enrollment tokens, and alert acknowledgements/dismissals
+are covered by the local HTTP fixtures.
