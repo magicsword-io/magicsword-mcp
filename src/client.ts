@@ -1,3 +1,4 @@
+import type { PolicyRuleInput } from './policy-rules.js';
 import { request as undiciRequest } from 'undici';
 import type {
   AgentReleasesResponse,
@@ -221,7 +222,7 @@ export class MagicSwordClient {
     policy_id?: string;
     policy_name?: string;
     platform?: string;
-    rules?: unknown[];
+    rules?: PolicyRuleInput[];
     event_ids?: string[];
     status?: 'allowed' | 'blocked' | 'disabled';
     type?: string;

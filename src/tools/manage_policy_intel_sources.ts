@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { defineTool, formatApiError, textError, textOk } from './shared.js';
 
+const attachmentResultSchema = z.object({
+  success: z.literal(true),
+  result: z.object({
+    sourcesAttached: z.number().int().nonnegative(),
+    skippedAlreadyAttached: z.number().int().nonnegative(),
+  }),
+});
+
 export const managePolicyIntelSourcesTool = defineTool({
   name: 'manage_policy_intel_sources',
   title: 'List, attach, or detach intel feeds on a policy',
@@ -9,7 +17,7 @@ export const managePolicyIntelSourcesTool = defineTool({
   inputSchema: {
     action: z.enum(['list', 'attach', 'detach']),
     policy_id: z.string().uuid(),
-    source_ids: z.array(z.string().uuid()).min(1).max(100).optional().describe('One or more source IDs for attach'),
+    source_ids: z.array(z.string().uuid()).min(1).max(60).optional().describe('1–60 enabled source IDs for attach; captures share the key creator\'s rate budget'),
     source_id: z.string().uuid().optional().describe('Source ID for detach'),
   },
   async handler({ action, policy_id, source_ids, source_id }, { client }) {
@@ -27,8 +35,22 @@ export const managePolicyIntelSourcesTool = defineTool({
         const ids = source_ids?.length ? source_ids : source_id ? [source_id] : [];
         if (ids.length === 0) return textError('source_ids or source_id is required for attach.');
         const result = await client.attachIntelSources(policy_id, ids);
+        const parsed = attachmentResultSchema.safeParse(result);
+        if (!parsed.success) {
+          return textError('The Portal returned an invalid attachment response; the outcome could not be verified. Use action=list to inspect attached sources before retrying; a new policy version may already have been created.');
+        }
+        const { sourcesAttached: attached, skippedAlreadyAttached: skipped } = parsed.data.result;
+        if (attached + skipped !== new Set(ids).size) {
+          return {
+            ...textError('The Portal attachment counts do not account for the requested sources. Use action=list to inspect attached sources before retrying; a new policy version may already have been created.'),
+            structuredContent: result as Record<string, unknown>,
+          };
+        }
+        const summary = attached === 0
+          ? `No changes needed: ${skipped} intel source(s) already attached.`
+          : `Attached ${attached} intel source(s) to policy ${policy_id}; ${skipped} already attached.`;
         return textOk(
-          `Attached ${ids.length} intel source(s) to policy ${policy_id}.`,
+          summary,
           result as Record<string, unknown>,
         );
       }

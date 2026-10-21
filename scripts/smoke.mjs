@@ -162,12 +162,14 @@ async function smokeToolHandlers() {
     },
     async enforcePolicy(policyId, token) {
       calls.push(['enforcePolicy', policyId, token]);
-      return { policy_id: policyId, status: 'enforcing' };
+      return { ok: true, policy_id: policyId, new_version_id: '00000000-0000-4000-8000-000000000103' };
     },
     async addPolicyRules(body) {
       calls.push(['addPolicyRules', body]);
       return {
         added_count: body.event_ids?.length ?? body.rules?.length ?? 0,
+        updated_count: 0,
+        duplicate_count: 0,
         version: 8,
       };
     },
