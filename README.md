@@ -153,7 +153,7 @@ Manual setup prints a credential-free launch entry for other local stdio MCP
 clients. Unattended setup without `--client` writes only the MagicSword file.
 
 Restart the selected client or start a new session to load `magicsword` and its
-21 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
+22 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
 discovery alone does not verify API-key scopes. Claude Desktop logs are at
 `~/Library/Logs/Claude/mcp*.log` on macOS. Browser-only clients require a remote
 MCP transport; this package provides a local stdio server.
@@ -171,13 +171,14 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `show_endpoint`               | Fetches one endpoint with OS, policy, compliance, upgrade, heartbeat, and AMSI details.                                        |
 | `list_agent_releases`         | Lists available agent versions and per-platform latest releases.                                                               |
 | `find_alerts`                 | Searches alerts by severity / ack state / since / hostname / MITRE technique.                                                  |
-| `list_events`                 | Lists audit/block telemetry events, including last-day event review workflows.                                                 |
+| `list_events`                 | Searches Investigate events by name, filename, path, hash, publisher, computer, or package family, with type/status/policy/endpoint/time filters. |
 | `triage_alert`                | Fetches one alert directly with triggering events, metadata, and file context; optionally acknowledges or dismisses it.        |
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
 | `show_policy`                 | Shows one policy by id.                                                                                                        |
 | `manage_policy_rules`         | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
 | `apply_policy_to_endpoints`   | Resolves endpoints and previews a policy assignment; `confirm=true` applies it after approval.                                |
 | `flip_to_enforcing`           | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical.                                    |
+| `list_intel_sources`          | Discovers enabled global and organization-owned intel sources and IDs, with platform and pagination filters. |
 | `list_customer_intel_feeds`   | Lists private intel feeds or feed items.                                                                                       |
 | `manage_customer_intel_feed`  | Creates or updates feeds; deletion requires a preview followed by `confirm=true`.                                              |
 | `manage_customer_intel_item`  | Edits feed items; deletion requires a preview followed by `confirm=true`.                                                      |
@@ -284,6 +285,52 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
         → Created a new policy version with 5 allowed rules.
 ```
 
+## Investigate events and attach intelligence
+
+Ask “Show audited filename events for image.png from the last week.” The agent
+calls `list_events` with `type=filename`, `status=audited`, `file_name=image.png`,
+and `hours=168`. `file_name` is an exact, case-sensitive match, including literal
+punctuation. For broader discovery, `q` searches the same seven fields as Portal
+Investigate: name, filename, path, hash, publisher, computer, and package family.
+It is a case-insensitive literal substring search accepting up to 120 characters,
+including Unicode, quotes, commas, parentheses, and Windows backslashes. `%`, `_`,
+and `*` are literal characters; wildcard and field-query syntax are not supported.
+Control characters are rejected. A blank query applies no text filter.
+Filters combine, so `type=filename` selects filename events rather than all event
+types that happen to include a filename. Omit `type` to search across event types.
+
+For example, “Find events from publisher Contoso, Inc. (R&D)” uses
+`list_events q="Contoso, Inc. (R&D)"`. To block a file found in those results,
+review the returned IDs and rule context, choose the intended rule type, and call
+`manage_policy_rules action=add policy_id=... event_ids=["<selected-event-id>"]
+status=blocked type=filename`. Search does not change policies or automatically
+block every match. Searching a publisher does not imply blocking that publisher;
+the selected rule type determines what is blocked. Event IDs can also derive
+other supported rules when appropriate, subject to Portal platform validation.
+
+The default window is 24 hours with statuses `audited,blocked`; use `since` for
+an explicit lower bound. The window uses the last observation time, falling back
+to creation time. Results include file paths, publishers, hashes, computers,
+occurrence counts, rule context, and pagination. Use `limit` and `offset` for
+additional pages. This is normalized event data rather than a raw event log.
+
+For “Attach LOLDrivers intel to my Windows policy”, the workflow is:
+
+1. `list_policies platform=windows` identifies the policy name and ID.
+2. `list_intel_sources platform=windows` returns available source names and IDs.
+   It defaults to enabled sources; use `is_enabled=false` to inspect disabled ones.
+   Use `limit` (up to 100) and `offset` to discover additional pages.
+3. `manage_policy_intel_sources action=list policy_id=...` shows current attachments.
+4. After identifying the intended policy and sources, use
+   `manage_policy_intel_sources action=attach policy_id=... source_ids=[...]`.
+   The result reports new attachments and sources already attached separately.
+5. List the policy attachments again to verify the result.
+
+Source discovery requires `intel:read`, policy discovery/attachment listing
+requires `policies:read`, and attachment requires `policies:write`. Source
+visibility does not guarantee premium entitlement; the API checks it when attaching.
+Attachments create a policy version and take effect as endpoints receive it.
+
 ## Configuration sources, in order of precedence
 
 1. `MAGICSWORD_API_KEY` / `MAGICSWORD_BASE_URL` env vars (set by the MCP host).
@@ -342,7 +389,7 @@ Tests validate `--help`, `--version`, production-default migration, private clie
 registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-all 21 tools' HTTP contracts and confirmation flows over modern and legacy
+all 22 tools' HTTP contracts and confirmation flows over modern and legacy
 stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
 actual mutation counts, and npm pack
 contents. `test:package` installs a production-only tarball and

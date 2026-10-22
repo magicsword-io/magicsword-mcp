@@ -2,6 +2,7 @@ import { whoamiTool } from './whoami.js';
 import { listEndpointsTool } from './list_endpoints.js';
 import { findAlertsTool } from './find_alerts.js';
 import { listEventsTool } from './list_events.js';
+import { listIntelSourcesTool } from './list_intel_sources.js';
 import { triageAlertTool } from './triage_alert.js';
 import { listPoliciesTool } from './list_policies.js';
 import { showPolicyTool } from './show_policy.js';
@@ -35,6 +36,7 @@ export const allTools = [
   applyPolicyToEndpointsTool,
   flipToEnforcingTool,
   listCustomerIntelFeedsTool,
+  listIntelSourcesTool,
   manageCustomerIntelFeedTool,
   manageCustomerIntelItemTool,
   upsertCustomerIntelItemsTool,
@@ -55,6 +57,7 @@ const READ_ONLY_TOOLS = new Set([
   'list_policies',
   'show_policy',
   'list_customer_intel_feeds',
+  'list_intel_sources',
   'agent_install_instructions',
 ]);
 

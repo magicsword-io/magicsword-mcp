@@ -68,6 +68,7 @@ async function smokeMcpServer(mode) {
     for (const required of [
       'whoami',
       'list_customer_intel_feeds',
+      'list_intel_sources',
       'manage_customer_intel_feed',
       'upsert_customer_intel_items',
       'manage_policy_rules',
@@ -77,7 +78,7 @@ async function smokeMcpServer(mode) {
     ]) {
       assert(toolNames.includes(required), `MCP server did not register required tool ${required}`);
     }
-    assert(toolNames.length === 21, `MCP server registered the wrong number of tools: ${toolNames.length}`);
+    assert(toolNames.length === 22, `MCP server registered the wrong number of tools: ${toolNames.length}`);
     const listEndpoints = listed.tools.find((tool) => tool.name === 'list_endpoints');
     const flipToEnforcing = listed.tools.find((tool) => tool.name === 'flip_to_enforcing');
     assert(listEndpoints?.annotations?.readOnlyHint === true, 'list_endpoints is not marked read-only');

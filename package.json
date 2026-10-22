@@ -23,7 +23,7 @@
     "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
     "start": "node dist/index.js",
     "configure": "node dist/index.js configure",
-    "test": "npm run build && node --test scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs scripts/policy-rules.test.mjs scripts/policy-rules-stdio.test.mjs scripts/tools-stdio.test.mjs scripts/enforcement.test.mjs scripts/intel-sources.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
+    "test": "npm run build && node --test scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs scripts/policy-rules.test.mjs scripts/policy-rules-stdio.test.mjs scripts/tools-stdio.test.mjs scripts/enforcement.test.mjs scripts/intel-sources.test.mjs scripts/investigate.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
     "test:package": "npm run build && node scripts/package-smoke.mjs",
     "version": "node scripts/sync-registry-version.mjs",
     "release:sync": "node scripts/sync-registry-version.mjs",
@@ -33,12 +33,12 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.3.1",
     "undici": "^7.29.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "^2.2.0",
+    "@modelcontextprotocol/client": "^2.3.1",
     "@types/node": "^22.10.0",
     "typescript": "^5.6.3"
   },

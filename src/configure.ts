@@ -82,7 +82,7 @@ export async function runConfigure(rawArgs: string[]): Promise<void> {
     const definition = serverDefinition(path, baseUrl);
     const target = registerClient(client ?? 'manual', definition, opts.clientConfig);
     if (target) {
-      stdout.write(`Registered magicsword with ${client} in ${target}.\nRestart the client or start a new session to load its 21 tools.\n`);
+      stdout.write(`Registered magicsword with ${client} in ${target}.\nRestart the client or start a new session to load its 22 tools.\n`);
     } else {
       stdout.write('\nChoose --client claude-desktop, codex, claude-code, or cursor to register automatically.\nFor another local stdio MCP client, merge this entry into its configuration:\n');
       stdout.write(`${JSON.stringify({ mcpServers: { magicsword: definition } }, null, 2)}\n`);
