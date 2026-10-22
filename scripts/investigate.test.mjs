@@ -9,7 +9,7 @@ test('INV-001: event text includes every returned row and investigation evidence
   const events = Array.from({ length: 75 }, (_, i) => ({
     id: `event-${i}`, type: 'filename', status: 'audited', platform: 'windows', file_name: 'image.png',
     file_path: 'C:\\image.png', file_hash: 'abc123', publisher: 'Fixture', computer_name: 'workstation',
-    occurrence_count: 7, created_at: '2020-01-01', last_seen_at: '2026-10-21',
+    package_family_name: 'Contoso.App_abc', occurrence_count: 7, created_at: '2020-01-01', last_seen_at: '2026-10-21',
   }));
   const page = { events, total: 80, limit: 75, offset: 0, since: '2026-10-20' };
   const args = { type: 'filename', status: 'audited', file_name: 'image.png', hours: 24, limit: 75 };
@@ -20,6 +20,7 @@ test('INV-001: event text includes every returned row and investigation evidence
   assert.match(result.content[0].text, /Showing 75 at offset 0/);
   assert.match(result.content[0].text, /id=event-74/);
   assert.match(result.content[0].text, /2026-10-21.*computer=workstation.*hash=abc123.*publisher=Fixture.*occurrences=7/);
+  assert.match(result.content[0].text, /package_family=Contoso.App_abc/);
 });
 
 test('INTEL-001: source discovery preserves IDs, scope, disabled filter and pagination', async () => {

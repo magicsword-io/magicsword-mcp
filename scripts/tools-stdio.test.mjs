@@ -91,6 +91,19 @@ for (const mode of ['auto', 'legacy']) {
       await call('list_intel_sources', { platform: 'windows', is_enabled: false, limit: 1, offset: 0 }, [get('/intel/sources', page('sources', { id: feedId, name: 'Fixture source', scope: 'global', is_enabled: false, is_premium: false }), { platform: 'windows', is_enabled: 'false', limit: '1', offset: '0' })]);
       await call('list_events', { type: 'filename', status: 'audited', file_name: 'image_(1).png', q: 'image', limit: 1, offset: 0 }, [get('/events', { ...page('events', { id: eventId, file_name: 'image_(1).png', type: 'filename', status: 'audited' }), since: '2026-10-18' }, { type: 'filename', status: 'audited', file_name: 'image_(1).png', q: 'image', limit: '1', offset: '0' })]);
       await call('list_events', { file_name: '' }, [], true);
+      const selectedSearch = await call('list_events', { q: 'Contoso, Inc. (R&D) "工具" 100%_*', hours: 168 }, [get('/events', {
+        events: [
+          { id: eventId, name: 'selected.exe', file_name: 'selected.exe', type: 'filename', status: 'audited', publisher: 'Contoso, Inc. (R&D) "工具" 100%_*' },
+          { id: id(402), name: 'unselected.exe', file_name: 'unselected.exe', type: 'filename', status: 'audited' },
+        ], total: 2, limit: 100, offset: 0, since: '2026-10-14',
+      }, { q: 'Contoso, Inc. (R&D) "工具" 100%_*', hours: '168' })]);
+      assert.deepEqual(selectedSearch.structuredContent.events.map(event => event.id), [eventId, id(402)]);
+      await call('manage_policy_rules', { action: 'add', policy_id: policyId, event_ids: [eventId], status: 'blocked', type: 'filename' }, [
+        write('POST', `/policies/${policyId}/rules`, { policy_id: policyId, event_ids: [eventId], status: 'blocked', type: 'filename' }, { added_count: 1, updated_count: 0, duplicate_count: 0 }),
+      ]);
+      for (const q of ['bad\nquery', 'bad\u0000query', 'bad\u0085query', 'x'.repeat(121)]) {
+        await call('list_events', { q }, [], true);
+      }
       await call('list_intel_sources', { platform: 'plan9' }, [], true);
       await call('list_policies', { platform: 'windows' }, [get('/policies', { policies: [policy] }, { platform: 'windows' })]);
       await call('show_policy', { policy_id: policyId }, [get(`/policies/${policyId}`, { policy })]);

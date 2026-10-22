@@ -171,7 +171,7 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `show_endpoint`               | Fetches one endpoint with OS, policy, compliance, upgrade, heartbeat, and AMSI details.                                        |
 | `list_agent_releases`         | Lists available agent versions and per-platform latest releases.                                                               |
 | `find_alerts`                 | Searches alerts by severity / ack state / since / hostname / MITRE technique.                                                  |
-| `list_events`                 | Queries Investigate audit/block events by type, status, exact filename, policy, endpoint, and time window.                                                 |
+| `list_events`                 | Searches Investigate events by name, filename, path, hash, publisher, computer, or package family, with type/status/policy/endpoint/time filters. |
 | `triage_alert`                | Fetches one alert directly with triggering events, metadata, and file context; optionally acknowledges or dismisses it.        |
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
 | `show_policy`                 | Shows one policy by id.                                                                                                        |
@@ -290,10 +290,23 @@ Claude: [calls manage_policy_rules action=add policy_name=Workstations event_ids
 Ask “Show audited filename events for image.png from the last week.” The agent
 calls `list_events` with `type=filename`, `status=audited`, `file_name=image.png`,
 and `hours=168`. `file_name` is an exact, case-sensitive match, including literal
-punctuation. `q` is a substring search across name, file, hash, path, and computer;
-it accepts up to 120 letters, numbers, spaces, dots, colons, slashes, or hyphens.
+punctuation. For broader discovery, `q` searches the same seven fields as Portal
+Investigate: name, filename, path, hash, publisher, computer, and package family.
+It is a case-insensitive literal substring search accepting up to 120 characters,
+including Unicode, quotes, commas, parentheses, and Windows backslashes. `%`, `_`,
+and `*` are literal characters; wildcard and field-query syntax are not supported.
+Control characters are rejected. A blank query applies no text filter.
 Filters combine, so `type=filename` selects filename events rather than all event
 types that happen to include a filename. Omit `type` to search across event types.
+
+For example, “Find events from publisher Contoso, Inc. (R&D)” uses
+`list_events q="Contoso, Inc. (R&D)"`. To block a file found in those results,
+review the returned IDs and rule context, choose the intended rule type, and call
+`manage_policy_rules action=add policy_id=... event_ids=["<selected-event-id>"]
+status=blocked type=filename`. Search does not change policies or automatically
+block every match. Searching a publisher does not imply blocking that publisher;
+the selected rule type determines what is blocked. Event IDs can also derive
+other supported rules when appropriate, subject to Portal platform validation.
 
 The default window is 24 hours with statuses `audited,blocked`; use `since` for
 an explicit lower bound. The window uses the last observation time, falling back

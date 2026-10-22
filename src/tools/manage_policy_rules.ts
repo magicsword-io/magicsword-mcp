@@ -8,6 +8,7 @@ export const managePolicyRulesTool = defineTool({
   description:
     'Lists rules stored on the current policy version, including materialized feed rules, or appends/updates explicit or event-derived rules while preserving existing rules and feed links. ' +
     'Use event_ids with status=allowed for “allow all these audit events on my policy”; the Portal will derive supported policy rules when possible. ' +
+    'Use list_events with q to find events across supported search fields, then pass only the selected IDs here; search terms are not rule values. ' +
     'Do not add explicit flat file-hash rules for Windows WDAC. Requires policies:read for list and policies:write for add.',
   inputSchema: {
     action: z.enum(['list', 'add']),
