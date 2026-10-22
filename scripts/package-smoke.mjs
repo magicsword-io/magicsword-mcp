@@ -66,8 +66,9 @@ try {
     try {
       await client.connect(transport);
       const { tools } = await client.listTools();
-      assert.equal(tools.length, 21, 'Installed MCP server must expose 21 tools');
+      assert.equal(tools.length, 22, 'Installed MCP server must expose 22 tools');
       assert(tools.some((tool) => tool.name === 'whoami'), 'Installed MCP server missing whoami');
+      assert.equal(tools.find((tool) => tool.name === 'list_intel_sources')?.annotations?.readOnlyHint, true);
       assert.equal(tools.find((tool) => tool.name === 'flip_to_enforcing')?.annotations?.destructiveHint, true);
     } finally {
       await client.close();

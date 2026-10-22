@@ -13,7 +13,7 @@ export const managePolicyIntelSourcesTool = defineTool({
   name: 'manage_policy_intel_sources',
   title: 'List, attach, or detach intel feeds on a policy',
   description:
-    'Lists, attaches, or detaches global/customer-owned intel feeds on a policy current version. Customer feeds only affect endpoints in that org with the feed attached. List requires policies:read; attach/detach require policies:write.',
+    'Lists, attaches, or detaches global/customer-owned intel feeds on a policy current version. First use list_policies to find policy_id and list_intel_sources to discover source IDs for that platform. Customer feeds only affect endpoints in that org with the feed attached. Attach/detach changes the policy version; show the selected policy and sources to the user before making the requested change. List requires policies:read; attach/detach require policies:write.',
   inputSchema: {
     action: z.enum(['list', 'attach', 'detach']),
     policy_id: z.string().uuid(),
@@ -24,9 +24,12 @@ export const managePolicyIntelSourcesTool = defineTool({
     try {
       if (action === 'list') {
         const result = await client.policyIntelSources(policy_id);
-        const sources = Array.isArray((result as any).sources) ? (result as any).sources : [];
+        const parsed = z.object({ sources: z.array(z.object({ id: z.string(), name: z.string() })) }).safeParse(result);
+        if (!parsed.success) return textError('The API returned an invalid source list; attached sources could not be verified.');
+        const sources = parsed.data.sources;
         return textOk(
-          `Policy ${policy_id} has ${sources.length} intel source(s) attached.`,
+          `Policy ${policy_id} has ${sources.length} intel source(s) attached.` +
+          (sources.length ? `\n\n${sources.map(source => `- ${source.name} — id: ${source.id}`).join('\n')}` : ''),
           result as Record<string, unknown>,
         );
       }

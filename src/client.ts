@@ -10,6 +10,7 @@ import type {
   EndpointDetailResponse,
   EndpointsResponse,
   EventsResponse,
+  IntelSourcesResponse,
   EnrollmentTokenResponse,
   MeResponse,
   PolicyDetailResponse,
@@ -303,6 +304,7 @@ export class MagicSwordClient {
       endpoint_id?: string;
       policy_id?: string;
       q?: string;
+      file_name?: string;
       limit?: number;
       offset?: number;
     } = {},
@@ -338,6 +340,10 @@ export class MagicSwordClient {
     return this.req<CustomerIntelFeedsResponse>('GET', '/intel/feeds', {
       query,
     });
+  }
+
+  intelSources(query: { platform?: string; is_enabled?: boolean; limit?: number; offset?: number } = {}): Promise<IntelSourcesResponse> {
+    return this.req<IntelSourcesResponse>('GET', '/intel/sources', { query });
   }
 
   createIntelFeed(body: {

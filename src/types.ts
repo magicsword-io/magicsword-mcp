@@ -212,6 +212,19 @@ export interface CustomerIntelFeedsResponse {
   offset?: number;
 }
 
+export interface IntelSource extends CustomerIntelFeed {
+  scope: 'global' | 'organization';
+  source_kind: string | null;
+  is_premium: boolean;
+}
+
+export interface IntelSourcesResponse {
+  sources: IntelSource[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface CustomerIntelItem {
   id: string;
   source_id: string;

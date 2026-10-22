@@ -3,9 +3,12 @@ import { defineTool, formatApiError, textOk } from './shared.js';
 
 export const listEventsTool = defineTool({
   name: 'list_events',
-  title: 'List MagicSword audit/block events',
+  title: 'Investigate MagicSword audit/block events',
   description:
-    'Lists normalized, rule-relevant org events as JSON without raw endpoint telemetry. Use this for requests like “show me the last day of audit events” or “find blocked events for this policy”. Requires alerts:read.',
+    'Queries normalized Investigate event data by type, status, filename, policy, or endpoint. ' +
+    'For “show filename audit events for image.png”, use type=filename, status=audited, file_name=image.png. ' +
+    'Defaults to audited and blocked events over the last 24 hours, based on when they were last observed. ' +
+    'Returns file paths, publishers, hashes, endpoint names, occurrence counts, timestamps, and rule context without raw telemetry. Requires alerts:read.',
   inputSchema: {
     hours: z
       .number()
@@ -19,26 +22,28 @@ export const listEventsTool = defineTool({
     platform: z.enum(['windows', 'macos', 'linux']).optional(),
     endpoint_id: z.string().uuid().optional(),
     policy_id: z.string().uuid().optional(),
-    q: z.string().max(255).optional().describe('Search name, file, hash, path, or computer'),
+    file_name: z.string().min(1).max(255).optional().describe('Exact, case-sensitive filename, e.g. image.png; punctuation is literal'),
+    q: z.string().max(120).optional().describe('Substring search across name, file, hash, path, or computer; letters, numbers, spaces, dots, colons, slashes, hyphens only. Use file_name for other filename characters.'),
     limit: z.number().int().positive().max(500).optional(),
-    offset: z.number().int().min(0).optional(),
+    offset: z.number().int().min(0).max(1_000_000).optional(),
   },
   async handler(args, { client }) {
     try {
       const result = await client.events(args);
       const lines = result.events
-        .slice(0, 50)
         .map((event) => {
           const ruleContext = event.rule_context
             ? ` rule_context=${JSON.stringify(event.rule_context)}`
             : '';
           return (
-            `- ${event.created_at ?? event.last_seen_at ?? ''} [${event.platform ?? '?'}] ${event.status}/${event.type} ` +
-            `${event.name ?? event.file_name ?? event.file_path ?? event.file_hash ?? event.id} id=${event.id}${ruleContext}`
+            `- ${event.last_seen_at ?? event.created_at ?? ''} [${event.platform ?? '?'}] ${event.status}/${event.type} ` +
+            `${event.file_name ?? event.name ?? event.id} id=${event.id} computer=${event.computer_name ?? '?'} ` +
+            `path=${event.file_path ?? '?'} hash=${event.file_hash ?? '?'} publisher=${event.publisher ?? '?'} ` +
+            `occurrences=${event.occurrence_count ?? '?'}${ruleContext}`
           );
         });
       return textOk(
-        `Found ${result.total} event(s) since ${result.since}. Showing ${result.events.length}.\n\n${lines.join('\n')}`,
+        `Found ${result.total} event(s) observed since ${result.since}. Showing ${result.events.length} at offset ${result.offset}.\n\n${lines.join('\n')}`,
         result as unknown as Record<string, unknown>,
       );
     } catch (err) {
