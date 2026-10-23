@@ -23,13 +23,16 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Verify public repository and main ancestry
         env:
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          RELEASE_IMMUTABLE: ${{ github.event.release.immutable }}
         run: |
           test "$GITHUB_REPOSITORY" = "magicsword-io/magicsword-mcp"
           test "$REPOSITORY_PRIVATE" = "false"
+          test "$RELEASE_IMMUTABLE" != "true" || { echo 'This workflow attaches tested assets after publishing; immutable releases need a draft-asset workflow first.'; exit 1; }
           git merge-base --is-ancestor HEAD origin/main
 
       - name: Set up Node.js
@@ -59,6 +62,19 @@ jobs:
 
       - name: Test installed production package
         run: npm run test:package
+
+      - name: Build and test desktop installer before publication
+        run: |
+          npm run bundle:desktop
+          npm run test:desktop
+
+      - name: Retain the tested desktop installer bytes
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-release-${{ github.event.release.tag_name }}
+          path: release-assets/magicsword-mcp.mcpb*
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Publish with npm trusted publishing
         run: npm publish --access public
@@ -110,3 +126,33 @@ jobs:
         run: |
           ./mcp-publisher login github-oidc
           ./mcp-publisher publish server.json
+
+  publish-desktop:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the exact tested installer
+        uses: actions/download-artifact@v8
+        with:
+          name: desktop-release-${{ github.event.release.tag_name }}
+          path: release-assets
+
+      - name: Verify the downloaded checksum
+        working-directory: release-assets
+        run: sha256sum --check magicsword-mcp.mcpb.sha256
+
+      - name: Attach installer and checksum to this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for asset in magicsword-mcp.mcpb magicsword-mcp.mcpb.sha256; do
+            if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fxq "$asset"; then
+              verification_dir="$(mktemp -d)"
+              gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$verification_dir"
+              cmp "release-assets/$asset" "$verification_dir/$asset"
+            else
+              gh release upload "$GITHUB_REF_NAME" "release-assets/$asset" --repo "$GITHUB_REPOSITORY"
+            fi
+          done

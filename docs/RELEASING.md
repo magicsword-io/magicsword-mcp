@@ -5,6 +5,12 @@ Releases publish `@magicsword-io/magicsword-mcp` to npm and then publish
 `.github/workflows/publish.yml`. Both publications use GitHub OIDC, so the
 release workflow does not require a long-lived token.
 
+Starting with 0.1.4, the workflow also attaches `magicsword-mcp.mcpb` and
+`magicsword-mcp.mcpb.sha256` to the same GitHub release after npm publication,
+alongside Registry publication. A Registry outage does not block the installer.
+Only the asset-upload job has `contents: write`; npm/Registry jobs
+retain their existing permissions and approval gate.
+
 ## Release acceptance contract
 
 The release path is an A3 change. These behavior IDs link its requirements to
@@ -15,9 +21,10 @@ the checks in this repository:
 | RELEASE-001 | `npm version` updates Registry versions automatically; tag, npm/lockfile versions, Registry version and npm reference agree; package identities agree. | `npm run release:verify -- v<version>`, negative metadata tests and actual stable → beta → stable lifecycle regression in `npm test`. |
 | RELEASE-002 | Only public releases from commits already on `main` can publish. | Public-repository and Git ancestry checks in `publish.yml`. |
 | RELEASE-003 | Known dependency advisories block publishing, including development dependencies used during builds/tests. | Full `npm audit` in CI, release workflow and `prepublishOnly`. |
-| RELEASE-004 | The production tarball installs and exposes the CLI and 21 tools without development dependencies. | `npm run test:package` on all three CI platforms and the Node 24 release runner. |
+| RELEASE-004 | The production tarball installs and exposes the CLI and 22 tools without development dependencies. | `npm run test:package` on all three CI platforms and the Node 24 release runner. |
 | RELEASE-005 | A maintainer approves public npm publication. | Configure the `npm-release` environment's required reviewer and trusted publisher binding below. Workflow configuration alone does not install protection rules. |
 | RELEASE-006 | Partial publication can recover without republishing an immutable npm version. | Registry-only retry and rollback procedure below. |
+| RELEASE-007 | The desktop bundle has the same version, securely collects a user key, and starts without global packages or saved credentials. | `bundle:desktop`, `test:desktop`, and manifest/version checks on macOS, Windows, and Linux CI runners. |
 
 Local checks establish candidate readiness. GitHub/npm settings, successful OIDC
 publication, provenance and an authenticated Portal check establish release
@@ -103,7 +110,8 @@ then use the automated workflow normally.
    working checkout, use `npm version 0.1.0 --no-git-tag-version` to return all
    metadata to the intended first stable version before merging/releasing.
 2. Run `npm ci`, `npm run release:verify -- v<version>`, `npm run typecheck`,
-   `npm test`, `npm audit`, and `npm run test:package`.
+   `npm test`, `npm audit`, `npm run test:package`, `npm run bundle:desktop`, and
+   `npm run test:desktop`. The version hook also updates `manifest.json`.
 3. Merge the reviewed change to `main` and verify all CI checks pass.
 4. Publish a GitHub release tagged exactly `v<package version>` targeting that
    `main` commit. Pushing a tag alone does not trigger this workflow.
@@ -168,6 +176,46 @@ the key or customer response bodies in release evidence.
   the bad version and ship a fixed patch version. Publish corrected Registry
   metadata in that new release and update the release notes. Keep published
   artifacts and tags immutable; do not use unpublish as routine rollback.
+
+## Desktop installer and directory submission
+
+The installer is produced from an explicit allow-list and locked production
+dependencies with npm lifecycle scripts disabled. It is validated with a
+vendored copy of the official MCPB 0.3 schema. ZIP ordering and timestamps are
+fixed; checksums can be reproduced on the same source/dependency set. Build
+dependencies are not included in the installer. The bundle is currently
+unsigned; a checksum establishes byte integrity, not a verified publisher.
+The gated npm job retains the exact tested installer as a workflow artifact;
+the write-scoped upload job only downloads, verifies, and attaches those bytes.
+It does not check out source code, install dependencies, or rebuild the bundle.
+The current latest release was checked as mutable. Enabling immutable GitHub
+releases requires a separate draft-release asset flow; the workflow rejects
+immutable release events before publishing npm.
+
+CI tests unpack the actual bundle into a temporary clean installation and
+exercise both MCP protocol modes against a local HTTP fixture. Before public
+distribution, also install the candidate in actual Claude Desktop on macOS and
+Windows with a read-scoped Enterprise test key. Verify key collection and the
+correct organization without saving customer response bodies or credentials.
+Local protocol tests do not prove the native Claude installer UI works.
+
+After release, verify both assets are present in GitHub Releases and that the
+portal `/mcp` download button appears (its release check refreshes every 15
+minutes). If only the desktop upload job fails, rerun that failed job; do not
+rerun successful immutable npm publication. The upload intentionally does not
+overwrite existing assets. If an interrupted upload left an asset, a rerun
+downloads and compares its bytes with the tested artifact, then uploads only
+missing assets. A mismatch fails and requires maintainer review; it is never
+silently overwritten.
+
+Submit the extension through the
+[Claude Desktop extension submission form](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
+Use the release asset URL, the project support/documentation links, an
+Enterprise demo organization with synthetic devices/events, and a demo of
+`whoami`, device discovery, and a read-only policy/intelligence workflow. Share
+reviewer access only through the submission provider's secure form. A release
+is downloadable before directory approval; it must not be described as
+Anthropic-reviewed until accepted.
 
 See [GitHub selective reruns](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)
 and [npm dist-tags](https://docs.npmjs.com/cli/v11/commands/npm-dist-tag/).

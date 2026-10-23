@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export function verifyRelease({ pkg, lock, server, tag = `v${pkg.version}` }) {
+export function verifyRelease({ pkg, lock, server, manifest, tag = `v${pkg.version}` }) {
   assert.equal(pkg.name, '@magicsword-io/magicsword-mcp', 'Unexpected npm package name');
   assert.equal(pkg.mcpName, 'io.github.magicsword-io/magicsword-mcp', 'Unexpected MCP name');
   assert.equal(server.name, pkg.mcpName, 'MCP Registry name must match package mcpName');
@@ -17,6 +17,9 @@ export function verifyRelease({ pkg, lock, server, tag = `v${pkg.version}` }) {
   assert.equal(registryPackage.registryType, 'npm', 'Expected npm Registry package');
   assert.equal(registryPackage.identifier, pkg.name, 'Registry package identifier must match');
   assert.equal(registryPackage.version, pkg.version, 'Registry package reference version must match');
+  assert(manifest, 'Desktop manifest is required');
+  assert.equal(manifest.version, pkg.version, 'Desktop manifest version must match');
+  assert.equal(manifest.name, 'magicsword-mcp', 'Unexpected desktop manifest name');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -26,6 +29,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       pkg: readJson('package.json'),
       lock: readJson('package-lock.json'),
       server: readJson('server.json'),
+      manifest: readJson('manifest.json'),
       tag: process.argv[2],
     });
     console.log('Release metadata checks passed');
