@@ -39,3 +39,24 @@ Client installation references:
 Native Windows CLI registration and terminal hiding require separate Windows
 verification. JSON/button and direct-CLI fallbacks remain available. No GUI
 activation claim should be made from the macOS stdio checks alone.
+
+## Installer guide screenshots
+
+Captured from the portal's download guide using a synthetic GitHub release
+fixture for version 0.1.4. These show the download UI after the installer and
+checksum are published. They do not establish public release availability,
+native Claude installation or directory approval. No API key is shown.
+
+Desktop:
+
+![Portal installer guide on desktop](screenshots/mcp-installer-desktop.png)
+
+<details>
+<summary>Mobile installer guide</summary>
+
+![Portal installer guide on mobile](screenshots/mcp-installer-mobile.png)
+
+</details>
+
+See [deployment order](RELEASING.md#first-desktop-installer-release-deployment-order)
+for the release sequence and publication checks.

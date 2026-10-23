@@ -128,6 +128,35 @@ Package smoke tests install a real temporary tarball; `npm publish` subsequently
 rebuilds via lifecycle hooks. The locally tested digest is candidate evidence,
 not proof that a particular tarball was published.
 
+## First desktop installer release: deployment order
+
+For the prepared 0.1.4 release:
+
+1. Complete actual Claude Desktop installation checks on macOS and Windows
+   with a read-scoped Enterprise test key. Merge the reviewed installer PR and
+   require the build/test checks on the resulting `main` commit.
+2. Deploy the portal setup guide before announcing the installer. Until a
+   stable GitHub release contains both assets, the guide keeps terminal setup
+   available. The hosted connector can remain disabled throughout this release.
+3. Publish a **GitHub release** `v0.1.4` targeting that reviewed `main` commit,
+   then obtain the existing `npm-release` environment approval. Do not bump
+   the version again if package/lockfile/Registry/manifest already say 0.1.4.
+   This asset flow requires a mutable release; immutable releases need the
+   separate draft-release flow described below.
+4. Wait for npm publication and the `publish-desktop` job. Registry publication
+   runs independently after npm and does not block desktop asset upload. Verify
+   `magicsword-mcp.mcpb` and `magicsword-mcp.mcpb.sha256` are attached, download
+   them and verify the checksum, then smoke-test the released installer.
+5. Allow the portal's 15-minute release cache to refresh and check the real
+   download button and checksum link. Submit the released extension to Claude's
+   directory after these checks; announce directory approval only after acceptance.
+
+Hosted Claude/ChatGPT/Grok OAuth is a separate portal rollout. Publishing this
+local installer neither enables nor requires that hosted connector. The portal
+can continue using published MCP package 0.1.3 until a separate dependency update.
+See the [portal download UI screenshots](CLIENT_SETUP.md#installer-guide-screenshots)
+for the fixture-based review views; these do not show native Claude installation.
+
 ## Verify the public release
 
 ```sh
