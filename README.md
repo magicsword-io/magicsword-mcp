@@ -16,6 +16,31 @@ the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
 ## Quick start
 
+### Claude Desktop installer
+
+For Claude Desktop on macOS or Windows, download **magicsword-mcp.mcpb** from
+[GitHub Releases](https://github.com/magicsword-io/magicsword-mcp/releases).
+The installer is included starting with version **0.1.4**. If that release is
+not available yet, use terminal setup below.
+
+1. Generate an Enterprise API key in **Magic Portal → Settings → API Keys**.
+   Start with read scopes for endpoints, alerts, and policies.
+2. In Claude Desktop, open **Settings → Extensions → Advanced settings →
+   Install Extension…**, then select the downloaded `.mcpb` file.
+3. Review the extension and enter your API key in its secure configuration
+   field. Claude stores this sensitive field using the operating system's
+   secure storage. The installer does not save a separate MagicSword key file.
+4. Start a new conversation, then ask MagicSword to call `whoami` followed by
+   `list_endpoints`. Confirm the organization and scopes.
+
+The installer includes the server and production dependencies and uses Claude
+Desktop's bundled Node runtime (22+). It requires no npm installation or JSON
+editing. Its SHA256 checksum is published beside the installer. A privately
+downloaded extension must be updated by installing a newer `.mcpb` file;
+automatic directory updates require a reviewed directory listing.
+
+### Terminal setup
+
 Requires **Node.js 22+**, an installed MCP client, and a MagicSword Enterprise
 API key from **Magic Portal → Settings → API Keys**.
 
