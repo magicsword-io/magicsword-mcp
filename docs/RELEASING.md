@@ -23,7 +23,7 @@ the checks in this repository:
 | RELEASE-003 | Known dependency advisories block publishing, including development dependencies used during builds/tests. | Full `npm audit` in CI, release workflow and `prepublishOnly`. |
 | RELEASE-004 | The production tarball installs and exposes the CLI and 22 tools without development dependencies. | `npm run test:package` on all three CI platforms and the Node 24 release runner. |
 | RELEASE-005 | A maintainer approves public npm publication. | Configure the `npm-release` environment's required reviewer and trusted publisher binding below. Workflow configuration alone does not install protection rules. |
-| RELEASE-006 | Partial publication can recover without republishing an immutable npm version. | Registry-only retry and rollback procedure below. |
+| RELEASE-006 | Partial publication can recover without republishing an immutable npm version. | Registry-only retry, retained desktop artifact recovery and rollback procedures below. |
 | RELEASE-007 | The desktop bundle has the same version, securely collects a user key, and starts without global packages or saved credentials. | `bundle:desktop`, `test:desktop`, and manifest/version checks on macOS, Windows, and Linux CI runners. |
 
 Local checks establish candidate readiness. GitHub/npm settings, successful OIDC
@@ -205,6 +205,92 @@ the key or customer response bodies in release evidence.
   the bad version and ship a fixed patch version. Publish corrected Registry
   metadata in that new release and update the release notes. Keep published
   artifacts and tags immutable; do not use unpublish as routine rollback.
+
+## Recover desktop assets after npm was accepted but its job failed
+
+If npm accepted the version but `publish-npm` failed afterward, both downstream
+jobs are skipped. Rerunning that npm job cannot overwrite the published version.
+Use the Registry-only recovery above and recover desktop assets separately from
+`desktop-release-v<version>` in that original run. The workflow retains the
+**tested bytes for 90 days**, subject to repository retention/deletion settings.
+Never rebuild a replacement for this recovery, move the tag, delete existing
+assets, or use `--clobber`. If the artifact is missing/expired, its checksum or
+version differs, or an existing asset differs, stop for maintainer review and
+plan a new release instead.
+
+Review the original run's successful metadata, audit, package and desktop test
+steps, artifact upload, and npm publication failure before proceeding. Confirm
+the published npm version and provenance belong to this release commit; version
+matching alone does not establish provenance. The checksum establishes byte
+integrity, not publisher identity. Run these commands in **Bash** with `gh`,
+`npm`, Python 3 and `shasum` installed, after setting the actual original run ID:
+
+```bash
+set -euo pipefail
+repo=magicsword-io/magicsword-mcp
+tag=v0.1.4
+run_id=REPLACE_WITH_ORIGINAL_RUN_ID
+version="${tag#v}"
+recovery_dir="$(mktemp -d)"
+
+gh run view "$run_id" --repo "$repo" \
+  --json headSha,event,workflowName,jobs,url
+# Inspect the jobs above; this must be the original Publish npm package run.
+test "$(gh run view "$run_id" --repo "$repo" --json event --jq .event)" = release
+test "$(gh run view "$run_id" --repo "$repo" --json workflowName --jq .workflowName)" = 'Publish npm package'
+test "$(gh run view "$run_id" --repo "$repo" --json headSha --jq .headSha)" = \
+  "$(gh api "repos/$repo/commits/$tag" --jq .sha)"
+gh api "repos/$repo/releases/tags/$tag" > "$recovery_dir/release.json"
+python3 - "$recovery_dir/release.json" "$tag" <<'PYTHON'
+import json, sys
+release = json.load(open(sys.argv[1]))
+assert release['tag_name'] == sys.argv[2]
+assert release.get('immutable') is False, 'Immutable release: stop recovery'
+assert not release['draft'] and not release['prerelease']
+PYTHON
+test "$(npm view "@magicsword-io/magicsword-mcp@$version" version)" = "$version"
+gh run download "$run_id" --repo "$repo" \
+  --name "desktop-release-$tag" --dir "$recovery_dir/tested"
+(cd "$recovery_dir/tested" && shasum -a 256 --check magicsword-mcp.mcpb.sha256)
+python3 - "$recovery_dir/tested/magicsword-mcp.mcpb" "$version" <<'PYTHON'
+import json, sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as bundle:
+    manifest = json.loads(bundle.read('manifest.json'))
+    package = json.loads(bundle.read('package.json'))
+assert manifest['version'] == package['version'] == sys.argv[2]
+assert package['name'] == '@magicsword-io/magicsword-mcp'
+PYTHON
+
+# External write: run only after reviewing the checks and provenance above.
+# Compare ALL existing assets before uploading any missing ones.
+gh release view "$tag" --repo "$repo" --json assets --jq '.assets[].name' \
+  > "$recovery_dir/existing-assets"
+for asset in magicsword-mcp.mcpb magicsword-mcp.mcpb.sha256; do
+  if grep -Fxq "$asset" "$recovery_dir/existing-assets"; then
+    gh release download "$tag" --repo "$repo" --pattern "$asset" \
+      --dir "$recovery_dir/existing"
+    cmp "$recovery_dir/tested/$asset" "$recovery_dir/existing/$asset"
+  fi
+done
+for asset in magicsword-mcp.mcpb magicsword-mcp.mcpb.sha256; do
+  if ! grep -Fxq "$asset" "$recovery_dir/existing-assets"; then
+    gh release upload "$tag" "$recovery_dir/tested/$asset" --repo "$repo"
+  fi
+done
+gh release download "$tag" --repo "$repo" --pattern 'magicsword-mcp.mcpb*' \
+  --dir "$recovery_dir/published"
+for asset in magicsword-mcp.mcpb magicsword-mcp.mcpb.sha256; do
+  cmp "$recovery_dir/tested/$asset" "$recovery_dir/published/$asset"
+done
+(cd "$recovery_dir/published" && shasum -a 256 --check magicsword-mcp.mcpb.sha256)
+```
+
+Keep the run URL, release commit, checksum and comparison results as sanitized
+release evidence, then complete the released-installer and download-link checks
+above. A concurrent upload causes a safe failure rather than replacement; repeat
+the comparison procedure before resuming. See the GitHub CLI documentation for
+[artifact download](https://cli.github.com/manual/gh_run_download) and
+[release upload](https://cli.github.com/manual/gh_release_upload).
 
 ## Desktop installer and directory submission
 
