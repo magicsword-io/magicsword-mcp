@@ -8,10 +8,16 @@ import { verifyRelease } from './verify-release.mjs';
 
 function release() {
   const readJson = (name) => JSON.parse(readFileSync(new URL(`../${name}`, import.meta.url), 'utf8'));
-  return { pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json') };
+  return { pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json'), manifest: readJson('manifest.json') };
 }
 
 test('current release metadata is consistent', () => verifyRelease(release()));
+
+test('requires desktop metadata on every release check', () => {
+  const data = release();
+  delete data.manifest;
+  assert.throws(() => verifyRelease(data), /Desktop manifest is required/);
+});
 
 test('rejects a tag for a different version', () => {
   assert.throws(() => verifyRelease({ ...release(), tag: 'v999.0.0' }), /Release tag/);
@@ -33,6 +39,8 @@ for (const [name, mutate, message] of [
   ['lockfile version', (data) => { data.lock.version = '999.0.0'; }, /Lockfile version/],
   ['lockfile root version', (data) => { data.lock.packages[''].version = '999.0.0'; }, /Lockfile root version/],
   ['Registry name', (data) => { data.server.name = 'io.github.other/server'; }, /Registry name/],
+  ['desktop version', (data) => { data.manifest.version = '999.0.0'; }, /Desktop manifest version/],
+  ['desktop name', (data) => { data.manifest.name = 'other'; }, /desktop manifest name/],
   ['npm identifier', (data) => { data.server.packages[0].identifier = '@other/server'; }, /identifier/],
   ['missing npm package', (data) => { data.server.packages = []; }, /one Registry package/],
   ['extra package reference', (data) => { data.server.packages.push({ ...data.server.packages[0] }); }, /one Registry package/],
@@ -47,7 +55,7 @@ for (const [name, mutate, message] of [
 test('allows a synchronized prerelease bootstrap', () => {
   const data = release();
   data.pkg.version = data.lock.version = data.lock.packages[''].version =
-    data.server.version = data.server.packages[0].version = '0.1.0-beta.0';
+    data.server.version = data.server.packages[0].version = data.manifest.version = '0.1.0-beta.0';
   verifyRelease(data);
 });
 
@@ -68,18 +76,20 @@ test('npm version synchronizes Registry metadata through beta bootstrap and stab
   };
   const fixture = release();
   fixture.pkg.version = fixture.lock.version = fixture.lock.packages[''].version =
-    fixture.server.version = fixture.server.packages[0].version = '0.1.0';
+    fixture.server.version = fixture.server.packages[0].version = fixture.manifest.version = '0.1.0';
   try {
     writeJson('package.json', fixture.pkg);
     writeJson('package-lock.json', fixture.lock);
     writeJson('server.json', fixture.server);
+    writeJson('manifest.json', fixture.manifest);
     mkdirSync(join(temporary, 'scripts'));
     for (const name of ['sync-registry-version.mjs', 'verify-release.mjs']) {
       copyFileSync(new URL(name, import.meta.url), join(temporary, 'scripts', name));
     }
     runNpm(['version', '0.1.0-beta.0', '--no-git-tag-version']);
     assert.equal(readJson('server.json').version, '0.1.0-beta.0');
-    verifyRelease({ pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json') });
+    assert.equal(readJson('manifest.json').version, '0.1.0-beta.0');
+    verifyRelease({ pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json'), manifest: readJson('manifest.json') });
 
     // Recover the exact interrupted/manual bootstrap state reported by the user.
     writeJson('server.json', fixture.server);
@@ -89,7 +99,7 @@ test('npm version synchronizes Registry metadata through beta bootstrap and stab
     assert.equal(readJson('server.json').version, '0.1.0-beta.0');
 
     runNpm(['version', '0.1.0', '--no-git-tag-version']);
-    verifyRelease({ pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json') });
+    verifyRelease({ pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json'), manifest: readJson('manifest.json') });
 
     // A sync must not hide incorrect ownership or an inconsistent lockfile.
     for (const corrupt of [

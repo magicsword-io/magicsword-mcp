@@ -1,0 +1,62 @@
+{
+  "manifest_version": "0.3",
+  "name": "magicsword-mcp",
+  "display_name": "MagicSword",
+  "version": "0.1.4",
+  "description": "Connect Claude Desktop to your MagicSword fleet, alerts, policies, and intelligence feeds.",
+  "long_description": "Use MagicSword conversationally: inspect devices, investigate audit events and alerts, update existing policy rules, preview policy assignments, create private intelligence feeds, and manage indicators. Requires a MagicSword Enterprise organization and an API key from Settings → API Keys. Your key's scopes determine access. Start with read scopes and ask for a proposal before applying changes. Initial policy creation happens in the MagicSword portal. Policy assignments, agent upgrades, and enforcement switches include explicit confirmation steps.",
+  "author": {
+    "name": "MagicSword",
+    "url": "https://www.magicsword.io"
+  },
+  "homepage": "https://www.magicsword.io/mcp",
+  "documentation": "https://github.com/magicsword-io/magicsword-mcp#claude-desktop-installer",
+  "support": "https://github.com/magicsword-io/magicsword-mcp/issues",
+  "privacy_policies": ["https://www.magicsword.io/privacy"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/magicsword-io/magicsword-mcp"
+  },
+  "icon": "assets/icon.png",
+  "license": "Apache-2.0",
+  "keywords": [
+    "magicsword",
+    "security",
+    "endpoint",
+    "application-control",
+    "intelligence"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "MAGICSWORD_API_KEY": "${user_config.api_key}",
+        "MAGICSWORD_BASE_URL": "https://www.magicsword.io"
+      }
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
+    "runtimes": {
+      "node": ">=22"
+    }
+  },
+  "tools_generated": true,
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "MagicSword API key",
+      "description": "Generate an Enterprise API key at https://www.magicsword.io/dashboard/settings?tab=api-keys. Start with read scopes for endpoints, alerts, and policies. This is separate from your device enrollment token.",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}

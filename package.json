@@ -1,7 +1,7 @@
 {
   "name": "@magicsword-io/magicsword-mcp",
   "mcpName": "io.github.magicsword-io/magicsword-mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MagicSword MCP server — manage MagicSword conversationally from Claude Desktop, Cursor, or any MCP-aware client.",
   "license": "Apache-2.0",
   "type": "module",
@@ -20,11 +20,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs",
+    "build": "node scripts/clean.mjs && tsc -p tsconfig.json && node scripts/postbuild.mjs",
     "start": "node dist/index.js",
     "configure": "node dist/index.js configure",
     "test": "npm run build && node --test scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs scripts/policy-rules.test.mjs scripts/policy-rules-stdio.test.mjs scripts/tools-stdio.test.mjs scripts/enforcement.test.mjs scripts/intel-sources.test.mjs scripts/investigate.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
     "test:package": "npm run build && node scripts/package-smoke.mjs",
+    "bundle:desktop": "npm run build && node scripts/build-mcpb.mjs",
+    "test:desktop": "node scripts/desktop-smoke.mjs",
     "version": "node scripts/sync-registry-version.mjs",
     "release:sync": "node scripts/sync-registry-version.mjs",
     "release:verify": "node scripts/verify-release.mjs",
@@ -34,12 +36,15 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.3.1",
-    "undici": "^7.29.1",
-    "zod": "^4.4.3"
+    "undici": "^7.30.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.3.1",
     "@types/node": "^22.10.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "fflate": "0.8.3",
     "typescript": "^5.6.3"
   },
   "repository": {
