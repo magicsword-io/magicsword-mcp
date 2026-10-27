@@ -9,7 +9,8 @@ Starting with 0.1.4, the workflow also attaches `magicsword-mcp.mcpb` and
 `magicsword-mcp.mcpb.sha256` to the same GitHub release after npm publication,
 alongside Registry publication. A Registry outage does not block the installer.
 Only the asset-upload job has `contents: write`; npm/Registry jobs
-retain their existing permissions and approval gate.
+retain their existing permissions. Publishing the GitHub release starts the
+checked publication flow without a second approval in Actions.
 
 ## Release acceptance contract
 
@@ -22,7 +23,7 @@ the checks in this repository:
 | RELEASE-002 | Only public releases from commits already on `main` can publish. | Public-repository and Git ancestry checks in `publish.yml`. |
 | RELEASE-003 | Known dependency advisories block publishing, including development dependencies used during builds/tests. | Full `npm audit` in CI, release workflow and `prepublishOnly`. |
 | RELEASE-004 | The production tarball installs and exposes the CLI and 22 tools without development dependencies. | `npm run test:package` on all three CI platforms and the Node 24 release runner. |
-| RELEASE-005 | A maintainer approves public npm publication. | Configure the `npm-release` environment's required reviewer and trusted publisher binding below. Workflow configuration alone does not install protection rules. |
+| RELEASE-005 | A maintainer authorizes publication by publishing a GitHub release; passing checks then publish automatically without an Actions approval. | Keep the `npm-release` environment and trusted publisher binding, restrict deployments to release tags, and configure no required reviewers or wait timer. Verify actual environment settings separately from workflow YAML. |
 | RELEASE-006 | Partial publication can recover without republishing an immutable npm version. | Registry-only retry, retained desktop artifact recovery and rollback procedures below. |
 | RELEASE-007 | The desktop bundle has the same version, securely collects a user key, and starts without global packages or saved credentials. | `bundle:desktop`, `test:desktop`, and manifest/version checks on macOS, Windows, and Linux CI runners. |
 
@@ -38,13 +39,14 @@ readiness; do not infer those from a local green build.
 2. Ensure the `@magicsword-io` npm organization exists and your npm account can
    publish public scoped packages with 2FA.
 3. Create a GitHub environment named exactly `npm-release` under repository
-   Settings → Environments. Configure a required reviewer, disable administrator
-   bypass, and allow selected **tags** matching `v*`. The npm publishing job uses
-   this environment. Also protect `main` with the CI build/test checks and protect
-   release tags against unauthorized creation, modification and deletion. Verify
-   these rules in GitHub; merely referencing an environment in YAML does not
-   configure reviewer protection. Required reviewers on GitHub Free/Pro/Team
-   require a public repository. See [GitHub environment protection](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+   Settings → Environments. Leave required reviewers empty and the wait timer
+   disabled, and allow selected **tags** matching `v*`. Keep this environment:
+   npm trusted publishing is bound to its name. Publishing the GitHub release is
+   the maintainer's approval; no additional Actions approval is required. Also
+   protect `main` with the CI build/test checks and protect release tags against
+   unauthorized creation, modification and deletion. Verify these rules in
+   GitHub; merely referencing an environment in YAML does not configure them.
+   See [GitHub environment protection](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 4. Bootstrap the package once because npm cannot configure a trusted publisher
    until the package exists. From a temporary clean checkout of the intended
    first release commit, run:
@@ -115,8 +117,12 @@ then use the automated workflow normally.
 3. Merge the reviewed change to `main` and verify all CI checks pass.
 4. Publish a GitHub release tagged exactly `v<package version>` targeting that
    `main` commit. Pushing a tag alone does not trigger this workflow.
-5. Inspect the pending run and approve its `npm-release` environment deployment
-   only after the candidate checks, review and an authenticated Portal check.
+5. The workflow runs automatically: metadata, typecheck, audit, tests and installed
+   package/desktop checks must pass before npm publication. No Actions approval
+   is needed. Complete candidate checks, review and an authenticated API check
+   before publishing the GitHub release, then monitor the run and verify the
+   published package and assets afterward. A merge or tag push alone does not
+   publish a package.
 
 The workflow checks every version and identity, rejects private repositories
 and off-main commits, runs the full audit and installed production package
@@ -138,8 +144,8 @@ For the prepared 0.1.4 release:
 2. Deploy the portal setup guide before announcing the installer. Until a
    stable GitHub release contains both assets, the guide keeps terminal setup
    available. The hosted connector can remain disabled throughout this release.
-3. Publish a **GitHub release** `v0.1.4` targeting that reviewed `main` commit,
-   then obtain the existing `npm-release` environment approval. Do not bump
+3. Publish a **GitHub release** `v0.1.4` targeting that reviewed `main` commit;
+   the workflow publishes automatically after its checks pass. Do not bump
    the version again if package/lockfile/Registry/manifest already say 0.1.4.
    This asset flow requires a mutable release; immutable releases need the
    separate draft-release flow described below.
