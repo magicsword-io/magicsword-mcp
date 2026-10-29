@@ -56,7 +56,7 @@ function createServer(client: MagicSwordClient): McpServer {
     {
       instructions:
         'MagicSword MCP exposes EDR management as conversational tools. Start with `whoami` to confirm the organization, key, and scopes. ' +
-        'Use `find_alerts`, `triage_alert`, and `list_events` for triage; `list_endpoints` then `show_endpoint` to inspect a fleet; `list_agent_releases` before upgrades; `upsert_customer_intel_items` to load report IOCs; and `manage_policy_rules` to add approved rules. ' +
+        'Use `find_alerts`, `triage_alert`, and `list_events` for triage; `list_endpoints` then `show_endpoint` to inspect a fleet; `list_agent_releases` before upgrades; `upsert_customer_intel_items` to load report IOCs; `create_policy` for a new empty audit policy; and `manage_policy_rules` to add approved rules. ' +
         'For Windows WDAC, do not create explicit flat file-hash policy rules; use event_ids so the Portal can derive supported rules, or use private intel feeds for hash/AuthentiHash/page-hash/TBS IOCs. ' +
         'Fleet-wide and destructive operations require an explicit confirmation; show the preview to the human first.',
     },
@@ -68,7 +68,7 @@ function createServer(client: MagicSwordClient): McpServer {
       {
         title: tool.title,
         description: tool.description,
-        inputSchema: z.object(tool.inputSchema),
+        inputSchema: 'strictInput' in tool && tool.strictInput ? z.strictObject(tool.inputSchema) : z.object(tool.inputSchema),
         annotations: annotationsForTool(tool.name),
       },
       async (args: Record<string, unknown>) => tool.handler(args as never, { client }),

@@ -4,7 +4,7 @@
   "display_name": "MagicSword",
   "version": "0.1.4",
   "description": "Connect Claude Desktop to your MagicSword fleet, alerts, policies, and intelligence feeds.",
-  "long_description": "Use MagicSword conversationally: inspect devices, investigate audit events and alerts, update existing policy rules, preview policy assignments, create private intelligence feeds, and manage indicators. Requires a MagicSword Enterprise organization and an API key from Settings → API Keys. Your key's scopes determine access. Start with read scopes and ask for a proposal before applying changes. Initial policy creation happens in the MagicSword portal. Policy assignments, agent upgrades, and enforcement switches include explicit confirmation steps.",
+  "long_description": "Use MagicSword conversationally: inspect devices, investigate audit events and alerts, create audit policies and update policy rules, preview policy assignments, create private intelligence feeds, and manage indicators. Requires active MagicSword access and an API key from Settings → API Keys. Free and Enterprise accounts are supported; your key's scopes and plan determine access. Start with read scopes and ask for a proposal before applying changes. New policies start empty in audit mode without device assignments. Policy assignments, agent upgrades, and enforcement switches include explicit confirmation steps.",
   "author": {
     "name": "MagicSword",
     "url": "https://www.magicsword.io"
@@ -54,7 +54,7 @@
     "api_key": {
       "type": "string",
       "title": "MagicSword API key",
-      "description": "Generate an Enterprise API key at https://www.magicsword.io/dashboard/settings?tab=api-keys. Start with read scopes for endpoints, alerts, and policies. This is separate from your device enrollment token.",
+      "description": "Generate an API key at https://www.magicsword.io/dashboard/settings?tab=api-keys. Start with read scopes for endpoints, alerts, and policies. This is separate from your device enrollment token.",
       "required": true,
       "sensitive": true
     }

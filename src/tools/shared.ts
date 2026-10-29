@@ -16,6 +16,7 @@ export interface ToolDefinition<Shape extends ZodRawShape> {
   name: string;
   title: string;
   description: string;
+  strictInput?: boolean;
   inputSchema: Shape;
   handler: (args: { [K in keyof Shape]: z.infer<Shape[K]> }, ctx: ToolContext) => Promise<ToolResultContent>;
 }

@@ -10,9 +10,9 @@ The server is a thin, opinionated wrapper around the
 `/api/public/v1/*` customer API exposed by the Magic Portal. It runs on
 the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
-> **Plan gate.** The customer API is Enterprise-only. With a pilot-tier key
-> the server returns a clear "this MagicSword org needs the Enterprise plan
-> to use MCP" message; nothing else works until the org is upgraded.
+> **Access.** MCP and the customer API support Free and Enterprise accounts
+> with active MagicSword access. Your key's scopes and plan determine which
+> operations are available; strict policy mode requires Enterprise.
 
 ## Quick start
 
@@ -23,7 +23,7 @@ For Claude Desktop on macOS or Windows, download **magicsword-mcp.mcpb** from
 The installer is included starting with version **0.1.4**. If that release is
 not available yet, use terminal setup below.
 
-1. Generate an Enterprise API key in **Magic Portal → Settings → API Keys**.
+1. Generate an API key in **Magic Portal → Settings → API Keys**.
    Start with read scopes for endpoints, alerts, and policies.
 2. In Claude Desktop, open **Settings → Extensions → Advanced settings →
    Install Extension…**, then select the downloaded `.mcpb` file.
@@ -41,7 +41,7 @@ automatic directory updates require a reviewed directory listing.
 
 ### Terminal setup
 
-Requires **Node.js 22+**, an installed MCP client, and a MagicSword Enterprise
+Requires **Node.js 22+**, an installed MCP client, and a MagicSword
 API key from **Magic Portal → Settings → API Keys**.
 
 **Recommended: install and connect your client in one command.** Setup prompts
@@ -178,7 +178,7 @@ Manual setup prints a credential-free launch entry for other local stdio MCP
 clients. Unattended setup without `--client` writes only the MagicSword file.
 
 Restart the selected client or start a new session to load `magicsword` and its
-22 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
+23 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
 discovery alone does not verify API-key scopes. Claude Desktop logs are at
 `~/Library/Logs/Claude/mcp*.log` on macOS. Browser-only clients require a remote
 MCP transport; this package provides a local stdio server.
@@ -199,6 +199,7 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `list_events`                 | Searches Investigate events by name, filename, path, hash, publisher, computer, or package family, with type/status/policy/endpoint/time filters. |
 | `triage_alert`                | Fetches one alert directly with triggering events, metadata, and file context; optionally acknowledges or dismisses it.        |
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
+| `create_policy`               | Creates a new empty audit policy for Windows, macOS, or Linux without assigning devices. Requires `policies:write`. |
 | `show_policy`                 | Shows one policy by id.                                                                                                        |
 | `manage_policy_rules`         | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
 | `apply_policy_to_endpoints`   | Resolves endpoints and previews a policy assignment; `confirm=true` applies it after approval.                                |
@@ -223,6 +224,40 @@ Tools publish standard MCP safety annotations. Read-only discovery tools are
 marked read-only and idempotent; enforcement, deletion, policy assignment,
 rule changes, and agent upgrades are marked destructive so MCP clients can
 apply appropriate confirmation UX.
+
+## Creating a policy
+
+Ask “Create a Windows policy named Block LOLBAS.” The agent calls:
+
+```json
+{
+  "name": "Block LOLBAS",
+  "platform": "windows",
+  "policy_mode": "blocklist"
+}
+```
+
+`create_policy` creates a new empty policy and version 1 in **audit mode** in the
+organization selected by your API key or connection. It returns the policy ID
+for subsequent rule and intelligence-source additions. It does not assign
+devices, make the policy a default, attach feeds, or switch enforcement on.
+Existing organization collection settings can be inherited.
+
+The name must contain 1–200 characters. `platform` is required; `policy_mode`
+defaults to `blocklist`. Windows/macOS `strict` mode requires Enterprise; Linux
+strict is unsupported. Free accounts can create blocklist policies. Creation
+requires `policies:write`; later list/show calls also require `policies:read`.
+
+For “Create Block LOLBAS and attach LOLBAS”, first create the policy, then use
+`list_intel_sources` to resolve the feed and `manage_policy_intel_sources` with
+the returned policy ID. Use `manage_policy_rules` for explicit or selected-event
+rules. Creation is a separate operation from building and deploying the policy.
+Every successful create call makes a new policy, including repeated names.
+Writes are not automatically retried: if the connection drops or the response
+cannot be verified, list policies before trying again.
+
+Deploy the Portal policy-creation route and migration before using this tool.
+Hosted Portal MCP includes the tool when the connection has policy write scope.
 
 ## Adding and listing policy rules
 
@@ -414,7 +449,7 @@ Tests validate `--help`, `--version`, production-default migration, private clie
 registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-all 22 tools' HTTP contracts and confirmation flows over modern and legacy
+all 23 tools' HTTP contracts and confirmation flows over modern and legacy
 stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
 actual mutation counts, and npm pack
 contents. `test:package` installs a production-only tarball and

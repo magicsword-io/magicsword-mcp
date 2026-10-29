@@ -215,6 +215,10 @@ export class MagicSwordClient {
     return this.req<PolicyDetailResponse>('GET', `/policies/${MagicSwordClient.pathId(policyId)}`);
   }
 
+  createPolicy(body: { name: string; platform: 'windows' | 'macos' | 'linux'; policy_mode?: 'blocklist' | 'strict' }): Promise<unknown> {
+    return this.req('POST', '/policies', { body });
+  }
+
   policyRules(policyId: string, query: { limit?: number; offset?: number } = {}): Promise<unknown> {
     return this.req('GET', `/policies/${MagicSwordClient.pathId(policyId)}/rules`, { query });
   }
