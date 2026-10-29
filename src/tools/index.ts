@@ -5,6 +5,7 @@ import { listEventsTool } from './list_events.js';
 import { listIntelSourcesTool } from './list_intel_sources.js';
 import { triageAlertTool } from './triage_alert.js';
 import { listPoliciesTool } from './list_policies.js';
+import { createPolicyTool } from './create_policy.js';
 import { showPolicyTool } from './show_policy.js';
 import { managePolicyRulesTool } from './manage_policy_rules.js';
 import { applyPolicyToEndpointsTool } from './apply_policy_to_endpoints.js';
@@ -31,6 +32,7 @@ export const allTools = [
   listEventsTool,
   triageAlertTool,
   listPoliciesTool,
+  createPolicyTool,
   showPolicyTool,
   managePolicyRulesTool,
   applyPolicyToEndpointsTool,

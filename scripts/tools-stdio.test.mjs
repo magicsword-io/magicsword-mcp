@@ -17,14 +17,14 @@ const alert = { id: alertId, severity: 'high', title: 'Fixture alert', created_a
 const page = (key, value) => ({ [key]: [value], total: 1, limit: 1, offset: 0 });
 const expectedTools = [
   'whoami', 'list_endpoints', 'show_endpoint', 'list_agent_releases', 'find_alerts', 'list_events',
-  'triage_alert', 'list_policies', 'show_policy', 'manage_policy_rules', 'apply_policy_to_endpoints',
+  'triage_alert', 'list_policies', 'create_policy', 'show_policy', 'manage_policy_rules', 'apply_policy_to_endpoints',
   'flip_to_enforcing', 'list_customer_intel_feeds', 'list_intel_sources', 'manage_customer_intel_feed', 'manage_customer_intel_item',
   'upsert_customer_intel_items', 'manage_policy_intel_sources', 'upgrade_endpoints', 'request_endpoint_checkin',
   'mint_enrollment_token', 'agent_install_instructions',
 ];
 
 for (const mode of ['auto', 'legacy']) {
-  test(`all 22 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
+  test(`all 23 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
     const pending = [];
     const exercised = new Set();
     const failures = [];
@@ -106,6 +106,19 @@ for (const mode of ['auto', 'legacy']) {
       }
       await call('list_intel_sources', { platform: 'plan9' }, [], true);
       await call('list_policies', { platform: 'windows' }, [get('/policies', { policies: [policy] }, { platform: 'windows' })]);
+      const createdPolicy = { ...policy, created_at: '2026-10-29', updated_at: '2026-10-29',
+        current_version: { ...policy.current_version, policy_id: policyId } };
+      const created = await call('create_policy', { name: '  Test Workstations  ', platform: 'windows' }, [
+        write('POST', '/policies', { name: 'Test Workstations', platform: 'windows', policy_mode: 'blocklist' }, { policy: createdPolicy }),
+      ]);
+      assert.equal(created.structuredContent.policy.id, policyId);
+      await call('create_policy', { name: 'Bad mode', platform: 'linux', policy_mode: 'strict' }, [], true);
+      for (const extra of [{ organization_id: id(1) }, { status: 'enforcing' }, { rules: [] }]) {
+        await call('create_policy', { name: 'Bad input', platform: 'windows', ...extra }, [], true);
+      }
+      await call('create_policy', { name: 'Transient failure', platform: 'windows' }, [
+        { ...write('POST', '/policies', { name: 'Transient failure', platform: 'windows', policy_mode: 'blocklist' }, { error: 'Unavailable' }), status: 503 },
+      ], true);
       await call('show_policy', { policy_id: policyId }, [get(`/policies/${policyId}`, { policy })]);
       const rules = [{ type: 'filename', value: 'rustdesk.exe', status: 'blocked' }];
       await call('manage_policy_rules', { action: 'add', policy_id: policyId, rules }, [write('POST', `/policies/${policyId}/rules`, { policy_id: policyId, rules }, { success: true, added_count: 1, updated_count: 0, duplicate_count: 0, version: 2 })]);
