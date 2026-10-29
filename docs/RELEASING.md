@@ -8,9 +8,24 @@ release workflow does not require a long-lived token.
 Starting with 0.1.4, the workflow also attaches `magicsword-mcp.mcpb` and
 `magicsword-mcp.mcpb.sha256` to the same GitHub release after npm publication,
 alongside Registry publication. A Registry outage does not block the installer.
-Only the asset-upload job has `contents: write`; npm/Registry jobs
-retain their existing permissions. Publishing the GitHub release starts the
-checked publication flow without a second approval in Actions.
+The release-creation and asset-upload jobs have `contents: write`; npm/Registry
+jobs retain `contents: read` and `id-token: write`. Merging to `main` is the
+publication approval. Successful main CI automatically creates the next patch
+release and dispatches the checked publication flow without another approval.
+
+The default flow is **merge → main CI → patch release → npm → Registry and desktop
+assets**. No manual version bump, tag, GitHub release, npm login or npm publish
+is required. Only the latest successful main push is eligible; stale/failed CI,
+PRs and forks cannot create a release. Every merge, including docs changes, gets
+a patch release. Rapid merges may be combined when an older CI run becomes stale.
+
+Automatic versioning uses the highest stable `v*` tag plus one patch. A manually
+higher stable source version can select a minor/major release. The checked-in
+version is a synchronized development baseline; the release runner materializes
+the tag version in package/lockfile/Registry/desktop metadata before all checks
+and builds. The tag still identifies the exact tested main commit. There is no
+bot commit to main and no branch-protection bypass. Inspect the installed CLI
+or npm for the published version, rather than the development baseline.
 
 ## Release acceptance contract
 
@@ -19,11 +34,11 @@ the checks in this repository:
 
 | ID | Required behavior | Evidence |
 | --- | --- | --- |
-| RELEASE-001 | `npm version` updates Registry versions automatically; tag, npm/lockfile versions, Registry version and npm reference agree; package identities agree. | `npm run release:verify -- v<version>`, negative metadata tests and actual stable → beta → stable lifecycle regression in `npm test`. |
+| RELEASE-001 | `npm version` materializes the tag version in build metadata; npm/lockfile/Registry/desktop identities and versions agree, while tracked source may retain its development baseline. | `npm run release:verify -- v<version>`, negative metadata tests and actual stable → beta → stable lifecycle regression in `npm test`. |
 | RELEASE-002 | Only public releases from commits already on `main` can publish. | Public-repository and Git ancestry checks in `publish.yml`. |
 | RELEASE-003 | Known dependency advisories block publishing, including development dependencies used during builds/tests. | Full `npm audit` in CI, release workflow and `prepublishOnly`. |
-| RELEASE-004 | The production tarball installs and exposes the CLI and 22 tools without development dependencies. | `npm run test:package` on all three CI platforms and the Node 24 release runner. |
-| RELEASE-005 | A maintainer authorizes publication by publishing a GitHub release; passing checks then publish automatically without an Actions approval. | Keep the `npm-release` environment and trusted publisher binding, restrict deployments to release tags, and configure no required reviewers or wait timer. Verify actual environment settings separately from workflow YAML. |
+| RELEASE-004 | The production tarball installs and exposes the CLI and 23 tools without development dependencies. | `npm run test:package` on all three CI platforms and the Node 24 release runner. |
+| RELEASE-005 | Merging to main authorizes automatic patch release after successful current main CI; checked publication proceeds without an Actions approval. | Keep the `npm-release` environment and trusted publisher binding, restrict deployments to release tags, and configure no required reviewers or wait timer. Verify actual environment settings separately from workflow YAML; `auto-release.test.mjs` covers trusted CI, stale runs, retries, version selection and dispatch guards. |
 | RELEASE-006 | Partial publication can recover without republishing an immutable npm version. | Registry-only retry, retained desktop artifact recovery and rollback procedures below. |
 | RELEASE-007 | The desktop bundle has the same version, securely collects a user key, and starts without global packages or saved credentials. | `bundle:desktop`, `test:desktop`, and manifest/version checks on macOS, Windows, and Linux CI runners. |
 
@@ -41,10 +56,19 @@ readiness; do not infer those from a local green build.
 3. Create a GitHub environment named exactly `npm-release` under repository
    Settings → Environments. Leave required reviewers empty and the wait timer
    disabled, and allow selected **tags** matching `v*`. Keep this environment:
-   npm trusted publishing is bound to its name. Publishing the GitHub release is
+   npm trusted publishing is bound to its name. Merging to main is
    the maintainer's approval; no additional Actions approval is required. Also
    protect `main` with the CI build/test checks and protect release tags against
-   unauthorized creation, modification and deletion. Verify these rules in
+   modification and deletion. Keep an active tag ruleset for `refs/tags/v*`
+   with **update/deletion** restrictions and admin-only bypass. Leave tag creation
+   governed by repository write permissions so GITHUB_TOKEN can create new tags.
+   GitHub rejected the built-in Actions app as a ruleset bypass actor here;
+   do not assume an app-only creation exception works. Repository writers and
+   workflows with contents:write may allocate new release tags, but may not
+   replace existing ones. Main/workflow review and pre-publication guards remain
+   the trust boundary. The creator rechecks the remote tag SHA before dispatch.
+   Actions receives no main bypass or long-lived token. The automatic release
+   job also needs actions:write to dispatch publish.yml. Verify these rules in
    GitHub; merely referencing an environment in YAML does not configure them.
    See [GitHub environment protection](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
 4. Bootstrap the package once because npm cannot configure a trusted publisher
@@ -105,38 +129,45 @@ then use the automated workflow normally.
 
 ## Each release
 
-1. Update `version` in `package.json`, both root version fields in
-   `package-lock.json`, and both `server.json` version locations (the top-level
-   server and `packages[0].version`). `npm version <version> --no-git-tag-version`
-   updates all of them through the version hook. After a beta bootstrap in your
-   working checkout, use `npm version 0.1.0 --no-git-tag-version` to return all
-   metadata to the intended first stable version before merging/releasing.
-2. Run `npm ci`, `npm run release:verify -- v<version>`, `npm run typecheck`,
-   `npm test`, `npm audit`, `npm run test:package`, `npm run bundle:desktop`, and
-   `npm run test:desktop`. The version hook also updates `manifest.json`.
-3. Merge the reviewed change to `main` and verify all CI checks pass.
-4. Publish a GitHub release tagged exactly `v<package version>` targeting that
-   `main` commit. Pushing a tag alone does not trigger this workflow.
-5. The workflow runs automatically: metadata, typecheck, audit, tests and installed
-   package/desktop checks must pass before npm publication. No Actions approval
-   is needed. Complete candidate checks, review and an authenticated API check
-   before publishing the GitHub release, then monitor the run and verify the
-   published package and assets afterward. A merge or tag push alone does not
-   publish a package.
+1. Merge a reviewed PR into `main`. Required Linux/macOS/Windows package checks
+   and focused tests must pass before merge.
+2. Main CI runs again. `auto-release.yml` accepts only successful push CI from
+   this repository at the latest main SHA, creates the next patch release tagged
+   at that SHA, and explicitly dispatches `publish.yml` at the tag. Explicit
+   dispatch is necessary because releases created with `GITHUB_TOKEN` do not
+   trigger another release-event workflow. No long-lived token is needed.
+3. `publish.yml` validates the stable public mutable release, tag, exact checkout
+   and main ancestry, materializes the tag version, and runs typecheck, full audit,
+   tests, installed-package and desktop checks. It refuses existing npm versions
+   and publication that would move `latest` backward. Then OIDC publishes npm,
+   followed independently by Registry metadata and the exact tested installer.
+4. Monitor both workflows and verify npm version/provenance, Registry metadata,
+   installer checksums and an authenticated read-only Portal check.
 
-The workflow checks every version and identity, rejects private repositories
-and off-main commits, runs the full audit and installed production package
-check, then publishes npm. It waits up to ten minutes for npm processing to make
-the package visible before publishing Registry metadata through GitHub OIDC. If
-npm processing takes longer, wait for `npm view` to find the version and rerun
-only the failed Registry job. Release runs are serialized.
-Package smoke tests install a real temporary tarball; `npm publish` subsequently
-rebuilds via lifecycle hooks. The locally tested digest is candidate evidence,
-not proof that a particular tarball was published.
+The release creator is serialized. Rerunning the same successful main CI reuses
+its existing tag/release and does not dispatch a duplicate queued/running/successful
+publication. A failed publication requires inspection and selective failed-job
+recovery, not a new version for the same commit. A stale run does nothing; the
+newer main run handles the combined change. A merge arriving after the final
+freshness check may get its own later release; each tagged source still passed CI.
+
+Manual releases remain a recovery path. A maintainer can publish a new stable
+GitHub release at a main commit, or dispatch `publish.yml` on an existing release
+tag. A tag push alone does not publish. Dispatching a branch, missing/draft/
+prerelease/immutable release, off-main commit or existing npm version fails closed.
+For a deliberate minor/major release, update the baseline with
+`npm version <version> --no-git-tag-version`, include all four metadata files,
+and merge normally. Ordinary patch releases require no version edits.
+
+npm processing may take ten minutes; Registry waits for availability. Rerun only
+the failed Registry job if processing takes longer. `npm publish` rebuilds through
+lifecycle hooks; local candidate digests are not proof of the published bytes.
+The npm-release environment remains restricted to `v*` tags without reviewers
+or a wait timer. See [GitHub workflow triggering](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
 
 ## First desktop installer release: deployment order
 
-For the prepared 0.1.4 release:
+Historical bootstrap procedure for 0.1.4 (subsequent releases use the automatic flow above):
 
 1. Complete actual Claude Desktop installation checks on macOS and Windows
    with a read-scoped Enterprise test key. Merge the reviewed installer PR and
@@ -189,8 +220,11 @@ the key or customer response bodies in release evidence.
 - If npm succeeded but the MCP Registry job failed, rerun **only failed jobs**:
   `gh run rerun RUN_ID --failed --repo magicsword-io/magicsword-mcp`.
   Do not rerun all jobs: npm versions cannot be overwritten. If a failed npm job
-  actually published the version, recover the Registry manually from the same
-  release commit with `mcp-publisher login github` and
+  actually published the version, recover the Registry manually from a clean checkout of the same
+  release tag. First materialize its version with
+  `npm version <tag-without-v> --no-git-tag-version --allow-same-version` and
+  `npm run release:verify -- <tag>`, because source may retain an older baseline.
+  Then use `mcp-publisher login github` and
   `mcp-publisher publish server.json`; organization namespace login requires an
   authorized organization owner. Do not delete or move the original release tag.
 - If Registry publication reports an existing version, inspect its metadata
@@ -242,7 +276,10 @@ recovery_dir="$(mktemp -d)"
 gh run view "$run_id" --repo "$repo" \
   --json headSha,event,workflowName,jobs,url
 # Inspect the jobs above; this must be the original Publish npm package run.
-test "$(gh run view "$run_id" --repo "$repo" --json event --jq .event)" = release
+case "$(gh run view "$run_id" --repo "$repo" --json event --jq .event)" in
+  release|workflow_dispatch) ;;
+  *) exit 1 ;;
+esac
 test "$(gh run view "$run_id" --repo "$repo" --json workflowName --jq .workflowName)" = 'Publish npm package'
 test "$(gh run view "$run_id" --repo "$repo" --json headSha --jq .headSha)" = \
   "$(gh api "repos/$repo/commits/$tag" --jq .sha)"

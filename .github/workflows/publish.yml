@@ -3,6 +3,7 @@ name: Publish npm package
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -45,6 +46,14 @@ jobs:
       - name: Pin npm CLI for trusted publishing
         run: npm install --global npm@11.12.0
 
+      - name: Validate release and materialize its version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/prepare-release.mjs
+
+      - name: Refuse duplicate or older npm publication
+        run: node scripts/check-unpublished.mjs
+
       - name: Install dependencies
         run: npm ci
 
@@ -71,7 +80,7 @@ jobs:
       - name: Retain the tested desktop installer bytes
         uses: actions/upload-artifact@v7
         with:
-          name: desktop-release-${{ github.event.release.tag_name }}
+          name: desktop-release-${{ github.ref_name }}
           path: release-assets/magicsword-mcp.mcpb*
           if-no-files-found: error
           retention-days: 90
@@ -88,6 +97,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -95,13 +107,15 @@ jobs:
           node-version: '24'
           package-manager-cache: false
 
-      - name: Verify Registry metadata version
-        run: npm run release:verify -- "$GITHUB_REF_NAME"
+      - name: Validate release and materialize Registry version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/prepare-release.mjs
 
       - name: Wait for npm package availability
         env:
           PACKAGE_NAME: '@magicsword-io/magicsword-mcp'
-          PACKAGE_VERSION: ${{ github.event.release.tag_name }}
+          PACKAGE_VERSION: ${{ github.ref_name }}
         run: |
           version="${PACKAGE_VERSION#v}"
           for attempt in {1..120}; do
@@ -136,7 +150,7 @@ jobs:
       - name: Download the exact tested installer
         uses: actions/download-artifact@v8
         with:
-          name: desktop-release-${{ github.event.release.tag_name }}
+          name: desktop-release-${{ github.ref_name }}
           path: release-assets
 
       - name: Verify the downloaded checksum

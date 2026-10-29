@@ -101,6 +101,12 @@ test('npm version synchronizes Registry metadata through beta bootstrap and stab
     runNpm(['version', '0.1.0', '--no-git-tag-version']);
     verifyRelease({ pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json'), manifest: readJson('manifest.json') });
 
+    // Automatic publication materializes a tag newer than the tracked baseline.
+    runNpm(['version', '0.1.5', '--no-git-tag-version', '--allow-same-version']);
+    runNpm(['version', '0.1.5', '--no-git-tag-version', '--allow-same-version']);
+    verifyRelease({ pkg: readJson('package.json'), lock: readJson('package-lock.json'), server: readJson('server.json'), manifest: readJson('manifest.json'), tag: 'v0.1.5' });
+    runNpm(['version', '0.1.0', '--no-git-tag-version']);
+
     // A sync must not hide incorrect ownership or an inconsistent lockfile.
     for (const corrupt of [
       () => { const server = readJson('server.json'); server.packages[0].identifier = '@other/server'; writeJson('server.json', server); },

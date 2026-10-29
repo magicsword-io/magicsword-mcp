@@ -454,7 +454,10 @@ stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
 actual mutation counts, and npm pack
 contents. `test:package` installs a production-only tarball and
 checks the installed CLI and MCP tool discovery; `release:verify` checks all
-release metadata. See `docs/RELEASING.md` for npm and MCP Registry releases.
+release metadata. Merging to `main` now creates the next patch release after
+main CI succeeds and automatically publishes npm, MCP Registry metadata and
+the desktop installer. No manual version bump or npm command is needed.
+See `docs/RELEASING.md` for checks, settings and recovery.
 
 An opt-in live policy test is also available after `npm run build`:
 
