@@ -328,6 +328,25 @@ export class MagicSwordClient {
     });
   }
 
+  clonePolicy(policyId: string, body: { name: string }): Promise<unknown> {
+    return this.req('POST', `/policies/${MagicSwordClient.pathId(policyId)}/clone`, { body });
+  }
+
+  endpointGroups(query: { limit?: number; offset?: number } = {}): Promise<unknown> {
+    return this.req('GET', '/endpoint-groups', { query });
+  }
+
+  previewPolicyAssignment(policyId: string, body: {
+    endpoint_ids?: string[]; hostname_pattern?: string; group_ids?: string[];
+    include_descendants?: boolean; platform?: string;
+  }): Promise<unknown> {
+    return this.req('POST', `/policies/${MagicSwordClient.pathId(policyId)}/assignment-preview`, { body });
+  }
+
+  assignPolicyWithConfirmation(policyId: string, confirmationToken: string): Promise<unknown> {
+    return this.req('POST', `/policies/${MagicSwordClient.pathId(policyId)}/assign`, { body: { confirmation_token: confirmationToken } });
+  }
+
   acknowledgeAlert(alertId: string, comment?: string): Promise<unknown> {
     return this.req('POST', `/alerts/${MagicSwordClient.pathId(alertId)}/acknowledge`, {
       body: comment ? { comment } : {},
