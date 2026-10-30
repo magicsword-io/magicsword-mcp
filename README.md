@@ -532,9 +532,10 @@ are retried; write actions are never retried automatically.
   response includes retry guidance; wait before submitting another batch.
   Attachment summaries report newly attached and already-attached counts
   separately. Invalid or incomplete counts require listing attachments before retrying.
-- **Fleet changes and deletion are explicit.** Endpoint upgrades, policy
-  assignments, and private-intel deletion return a no-op preview unless the
-  approved follow-up call includes `confirm=true`.
+- **Fleet changes and deletion are explicit.** Endpoint upgrades and private-intel
+  deletion require a preview followed by an approved `confirm=true` call. Policy
+  assignment requires a concrete preview followed by its server-issued
+  `confirmation_token`; `confirm=true` alone cannot commit an assignment.
 - **Windows WDAC policy edits should not use explicit flat file hashes.**
   Use `manage_policy_rules` with `event_ids` when approving audit events so
   the Portal can derive supported path / publisher / filename rules, or use
