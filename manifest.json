@@ -4,7 +4,7 @@
   "display_name": "MagicSword",
   "version": "0.1.4",
   "description": "Connect Claude Desktop to your MagicSword fleet, alerts, policies, and intelligence feeds.",
-  "long_description": "Use MagicSword conversationally: inspect devices, investigate audit events and alerts, create audit policies and update policy rules, preview policy assignments, create private intelligence feeds, and manage indicators. Requires active MagicSword access and an API key from Settings → API Keys. Free and Enterprise accounts are supported; your key's scopes and plan determine access. Start with read scopes and ask for a proposal before applying changes. New policies start empty in audit mode without device assignments. Policy assignments, agent upgrades, and enforcement switches include explicit confirmation steps.",
+  "long_description": "Use MagicSword conversationally: inspect devices, investigate audit events and alerts, create or clone audit policies, update policy rules, discover computer groups, and preview assignments to selected computers or current group members, create private intelligence feeds, and manage indicators. Requires active MagicSword access and an API key from Settings → API Keys. Free and Enterprise accounts are supported; your key's scopes and plan determine access. Start with read scopes and ask for a proposal before applying changes. New policies start empty in audit mode without device assignments. Policy assignments require a server-issued confirmation token after reviewing the concrete computers and replacement of existing desired policies; agent upgrades and enforcement switches also include confirmation steps.",
   "author": {
     "name": "MagicSword",
     "url": "https://www.magicsword.io"

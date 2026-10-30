@@ -16,7 +16,7 @@ const endpoint = { id: endpointId, computer_name: 'test-win-01', platform: 'wind
 const alert = { id: alertId, severity: 'high', title: 'Fixture alert', created_at: '2026-10-19T00:00:00Z' };
 const page = (key, value) => ({ [key]: [value], total: 1, limit: 1, offset: 0 });
 const expectedTools = [
-  'whoami', 'list_endpoints', 'show_endpoint', 'list_agent_releases', 'find_alerts', 'list_events',
+  'whoami', 'list_endpoint_groups', 'clone_policy', 'list_endpoints', 'show_endpoint', 'list_agent_releases', 'find_alerts', 'list_events',
   'triage_alert', 'list_policies', 'create_policy', 'show_policy', 'manage_policy_rules', 'apply_policy_to_endpoints',
   'flip_to_enforcing', 'list_customer_intel_feeds', 'list_intel_sources', 'manage_customer_intel_feed', 'manage_customer_intel_item',
   'upsert_customer_intel_items', 'manage_policy_intel_sources', 'upgrade_endpoints', 'request_endpoint_checkin',
@@ -24,7 +24,7 @@ const expectedTools = [
 ];
 
 for (const mode of ['auto', 'legacy']) {
-  test(`all 23 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
+  test(`all 25 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
     const pending = [];
     const exercised = new Set();
     const failures = [];
@@ -123,10 +123,24 @@ for (const mode of ['auto', 'legacy']) {
       const rules = [{ type: 'filename', value: 'rustdesk.exe', status: 'blocked' }];
       await call('manage_policy_rules', { action: 'add', policy_id: policyId, rules }, [write('POST', `/policies/${policyId}/rules`, { policy_id: policyId, rules }, { success: true, added_count: 1, updated_count: 0, duplicate_count: 0, version: 2 })]);
       await call('manage_policy_rules', { action: 'list', policy_id: policyId, limit: 1 }, [get(`/policies/${policyId}/rules`, page('rules', rules[0]), { limit: '1' })]);
+      const groups = { groups: [{ id: id(701), name: 'Workstations', parent_group_id: null, description: null }], total: 1, limit: 1, offset: 0 };
+      await call('list_endpoint_groups', { limit: 1 }, [get('/endpoint-groups', groups, { limit: '1' })]);
+      const cloned = { policy: { ...createdPolicy, id: id(111), current_version: { ...createdPolicy.current_version, id: id(112), policy_id: id(111), parent_version_id: null, name: 'Test clone' } },
+        cloned_from: { policy_id: policyId, version_id: id(102) }, copied: { rules: 1001, intelligence_sources: 2, analytics_collections: 1 } };
+      await call('clone_policy', { policy_id: policyId, name: '  Test clone  ' }, [write('POST', `/policies/${policyId}/clone`, { name: 'Test clone' }, cloned)]);
+      await call('clone_policy', { policy_id: policyId, name: 'Bad clone', status: 'enforcing' }, [], true);
       const assignment = { policy_id: policyId, endpoint_ids: [endpointId] };
-      const preview = await call('apply_policy_to_endpoints', assignment, [get('/policies', { policies: [policy] })]);
+      const assignmentToken = 'msac_' + 'a'.repeat(43);
+      const assignmentPreview = { policy_id: policyId, current_version_id: id(102), platform: 'windows', status: 'audit', policy_mode: 'blocklist',
+        endpoint_count: 1, would_assign: [{ ...endpoint, desired_policy_ids: [policyId] }], requires_confirmation: true,
+        confirmation: { token: assignmentToken, expires_at: '2100-01-01T00:00:00Z', action: 'policy.assign' } };
+      const preview = await call('apply_policy_to_endpoints', assignment, [write('POST', `/policies/${policyId}/assignment-preview`, { endpoint_ids: [endpointId] }, assignmentPreview)]);
       assert.equal(preview.structuredContent.requires_confirmation, true);
-      await call('apply_policy_to_endpoints', { ...assignment, confirm: true }, [get('/policies', { policies: [policy] }), write('POST', `/policies/${policyId}/assign-endpoints`, { endpoint_ids: [endpointId] })]);
+      await call('apply_policy_to_endpoints', { policy_id: policyId, group_ids: [id(701)] }, [write('POST', `/policies/${policyId}/assignment-preview`, { group_ids: [id(701)], include_descendants: true }, assignmentPreview)]);
+      await call('apply_policy_to_endpoints', { policy_id: policyId, hostname_pattern: 'test-*', platform: 'windows' }, [write('POST', `/policies/${policyId}/assignment-preview`, { hostname_pattern: 'test-*', platform: 'windows' }, assignmentPreview)]);
+      await call('apply_policy_to_endpoints', { ...assignment, confirm: true }, [], true);
+      await call('apply_policy_to_endpoints', { policy_id: policyId, confirmation_token: assignmentToken }, [write('POST', `/policies/${policyId}/assign`, { confirmation_token: assignmentToken },
+        { success: true, policy_id: policyId, current_version_id: id(102), updated: 1, endpoint_ids: [endpointId], assignment_status: 'pending_checkin' })]);
       const enforcement = await call('flip_to_enforcing', { policy_id: policyId }, [write('POST', `/policies/${policyId}/enforce-preview`, { acknowledge_blockers: false }, { can_enforce: true, preflight: { endpoint_count: 1 }, confirmation: { token: 'test-confirm-token', expires_at: '2026-10-19T01:00:00Z' }, blockers: [] })]);
       assert.match(enforcement.content[0].text, /test-confirm-token/);
       await call('flip_to_enforcing', { policy_id: policyId, confirmation_token: 'test-confirm-token' }, [write('POST', `/policies/${policyId}/enforce`, { confirmation_token: 'test-confirm-token' }, { ok: true, policy_id: policyId, new_version_id: id(103) })]);

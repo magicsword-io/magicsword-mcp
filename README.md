@@ -178,7 +178,7 @@ Manual setup prints a credential-free launch entry for other local stdio MCP
 clients. Unattended setup without `--client` writes only the MagicSword file.
 
 Restart the selected client or start a new session to load `magicsword` and its
-23 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
+25 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
 discovery alone does not verify API-key scopes. Claude Desktop logs are at
 `~/Library/Logs/Claude/mcp*.log` on macOS. Browser-only clients require a remote
 MCP transport; this package provides a local stdio server.
@@ -192,6 +192,7 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | Tool                          | What it does                                                                                                                   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `whoami`                      | Returns organization, key id, and scopes. Always call first when troubleshooting.                                             |
+| `list_endpoint_groups`        | Lists organization computer groups and parent group IDs for assignment previews. Requires `endpoints:read`. |
 | `list_endpoints`              | Lists endpoints with optional platform / status / hostname-glob filtering.                                                     |
 | `show_endpoint`               | Fetches one endpoint with OS, policy, compliance, upgrade, heartbeat, and AMSI details.                                        |
 | `list_agent_releases`         | Lists available agent versions and per-platform latest releases.                                                               |
@@ -200,9 +201,10 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `triage_alert`                | Fetches one alert directly with triggering events, metadata, and file context; optionally acknowledges or dismisses it.        |
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
 | `create_policy`               | Creates a new empty audit policy for Windows, macOS, or Linux without assigning devices. Requires `policies:write`. |
+| `clone_policy`                | Copies a policy into an independent audit policy with its rules, settings, intelligence links and collection links; no computers assigned. |
 | `show_policy`                 | Shows one policy by id.                                                                                                        |
 | `manage_policy_rules`         | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
-| `apply_policy_to_endpoints`   | Resolves endpoints and previews a policy assignment; `confirm=true` applies it after approval.                                |
+| `apply_policy_to_endpoints`   | Previews assignment to computer IDs, hostname matches, or groups; a server-issued `confirmation_token` commits the approved snapshot.                                |
 | `flip_to_enforcing`           | Two-step preview/confirm flip with a server-issued one-time confirm token. Safety-critical.                                    |
 | `list_intel_sources`          | Discovers enabled global and organization-owned intel sources and IDs, with platform and pagination filters. |
 | `list_customer_intel_feeds`   | Lists private intel feeds or feed items.                                                                                       |
@@ -218,7 +220,9 @@ environment. Keep API keys out of shared config snippets and screenshots.
 Write tools require matching Customer API scopes in Magic Portal, such as
 `alerts:write`, `policies:write`, `endpoints:write`, or `intel:write`.
 Event review uses `alerts:read`; turning selected events into policy rules
-uses `policies:write`.
+uses `policies:write`. Cloning requires `policies:write`; group discovery requires
+`endpoints:read`; assignment preview and commit require **both** `policies:write`
+and `endpoints:read`.
 
 Tools publish standard MCP safety annotations. Read-only discovery tools are
 marked read-only and idempotent; enforcement, deletion, policy assignment,
@@ -258,6 +262,116 @@ cannot be verified, list policies before trying again.
 
 Deploy the Portal policy-creation route and migration before using this tool.
 Hosted Portal MCP includes the tool when the connection has policy write scope.
+
+## Cloning and assigning to computers or groups
+
+You can ask: “Clone Workstations as Finance pilot, then assign the copy to
+FINANCE-01,” “assign it to these three computers,” or “assign it to the Finance
+group.” The client discovers the source policy and targets, creates a copy,
+and shows an assignment preview before committing after your approval.
+
+Call `clone_policy` with the source ID from `list_policies` and a new name:
+
+```json
+{ "policy_id": "<source-policy-uuid>", "name": "Finance pilot" }
+```
+
+The returned `policy.id` is the **new** policy ID. The copy starts at version 1
+in audit mode even if the source enforces. It preserves supported policy and
+version settings, all rules (including signer/file-attribute relationships),
+intelligence links and sync watermarks, and analytics collection links. Feeds
+and collections remain shared; their underlying data is not duplicated. The
+source, device assignments, organization defaults, version history, and generated
+policy artifacts are not copied or changed. If your plan cannot preserve the
+content, the request fails instead of silently removing protections. A clone
+may inherit the organization's collection settings, as with other new policies.
+
+Cloning alone assigns no computers. Find device IDs using `list_endpoints`, or
+get group IDs and hierarchy using `list_endpoint_groups`:
+
+```json
+{ "limit": 100, "offset": 0 }
+```
+
+Group pages include `id`, `name`, `parent_group_id`, and `description`, with
+`total`, `limit`, and `offset`. Maximum page size is 500; page through the full
+list when resolving a group name. Names must resolve unambiguously before use.
+
+Preview with `apply_policy_to_endpoints` using **one** selector. Replace the
+placeholders below with real UUIDs and use the newly returned clone ID:
+
+```json
+{ "policy_id": "<cloned-policy-uuid>", "endpoint_ids": ["<computer-uuid>"] }
+```
+
+```json
+{
+  "policy_id": "<cloned-policy-uuid>",
+  "endpoint_ids": ["<computer-1-uuid>", "<computer-2-uuid>", "<computer-3-uuid>"]
+}
+```
+
+```json
+{
+  "policy_id": "<cloned-policy-uuid>",
+  "group_ids": ["<finance-group-uuid>"],
+  "include_descendants": true
+}
+```
+
+You can also use `hostname_pattern`, such as `FINANCE-*`, with an optional
+`platform` filter. Select at most 50 groups and 500 resolved computers per
+preview. Subgroups are included by default; set `include_descendants=false`
+for direct members only. Overlapping groups resolve each computer once.
+Foreign, missing, incompatible-platform, agentless, or uninstalled targets
+reject the whole request. An empty or oversized selection is not deployed.
+
+The preview shows the exact computers, previous assignments, policy status and
+mode, plus a five-minute confirmation token. **Assignment replaces the previous
+desired policy set**; it is not additive. An audit copy can remove existing
+blocking protection, and assigning an enforcing policy can cause applications
+to be blocked. Review that change with the human before committing.
+
+After approval, call the same tool with **only** the policy ID and the returned
+`confirmation.token`:
+
+```json
+{
+  "policy_id": "<cloned-policy-uuid>",
+  "confirmation_token": "<token-from-preview>"
+}
+```
+
+The server binds approval to the key, organization, policy content and concrete
+computer snapshot. Expired/reused tokens, changed policy content or previous
+assignments, and newly ineligible computers require a fresh preview. Membership
+changes do not expand the approved set. This is a one-time assignment to members
+at preview time, **not** a persistent rule for computers added later.
+
+Success means `policy_id` and `desired_policy_ids` were saved atomically for
+all targets, pending agent check-in; it does not prove device installation.
+Use `show_endpoint` and subsequent check-ins to inspect actual deployment.
+This flow does not itself change the policy's audit/enforcement status.
+
+`confirm=true` alone no longer authorizes this tool. Existing callers must use
+the server token; sending selectors with a token is rejected. Writes are never
+retried automatically. If a clone or assignment response is missing/malformed,
+reconcile with `list_policies` or endpoint desired state before retrying: the
+operation may already have committed.
+
+The customer API exposes the same workflow:
+
+| Method | Route under `/api/public/v1` | Body / purpose |
+| --- | --- | --- |
+| POST | `/policies/{sourceId}/clone` | `{ "name": "Finance pilot" }`; returns 201 with the new audit policy, source IDs and copied counts. |
+| GET | `/endpoint-groups` | `limit` and `offset` query parameters; tenant-scoped group discovery. |
+| POST | `/policies/{policyId}/assignment-preview` | One selector and its options; returns concrete targets and a confirmation token. |
+| POST | `/policies/{policyId}/assign` | `{ "confirmation_token": "..." }`; returns desired-state count and endpoint IDs, `assignment_status=pending_checkin`. |
+
+Deploy the **Portal migrations and routes first**. Hosted MCP includes these
+calls after that deployment; then merge the MCP PR to trigger its automatic npm
+release. Upgrade existing local MCP installs and restart their client to load
+the new tools. Do not point a new client at a Portal that lacks these routes.
 
 ## Adding and listing policy rules
 
@@ -418,9 +532,10 @@ are retried; write actions are never retried automatically.
   response includes retry guidance; wait before submitting another batch.
   Attachment summaries report newly attached and already-attached counts
   separately. Invalid or incomplete counts require listing attachments before retrying.
-- **Fleet changes and deletion are explicit.** Endpoint upgrades, policy
-  assignments, and private-intel deletion return a no-op preview unless the
-  approved follow-up call includes `confirm=true`.
+- **Fleet changes and deletion are explicit.** Endpoint upgrades and private-intel
+  deletion require a preview followed by an approved `confirm=true` call. Policy
+  assignment requires a concrete preview followed by its server-issued
+  `confirmation_token`; `confirm=true` alone cannot commit an assignment.
 - **Windows WDAC policy edits should not use explicit flat file hashes.**
   Use `manage_policy_rules` with `event_ids` when approving audit events so
   the Portal can derive supported path / publisher / filename rules, or use
@@ -449,7 +564,7 @@ Tests validate `--help`, `--version`, production-default migration, private clie
 registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-all 23 tools' HTTP contracts and confirmation flows over modern and legacy
+all 25 tools' HTTP contracts and confirmation flows over modern and legacy
 stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
 actual mutation counts, and npm pack
 contents. `test:package` installs a production-only tarball and
