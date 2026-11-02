@@ -10,11 +10,12 @@ The server is a thin, opinionated wrapper around the
 `/api/public/v1/*` customer API exposed by the Magic Portal. It runs on
 the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
-> **Access.** MCP and the customer API support Free and Enterprise accounts
-> with active MagicSword access. Your key's scopes and plan determine which
-> operations are available; strict policy mode requires Enterprise.
-
 ## Quick start
+
+> **Free to use.** MagicSword MCP and the customer API are available on the
+> **Free plan**, as well as Enterprise. Get started with a Free account and an
+> API key; no Enterprise subscription is required. Your key's scopes and plan
+> determine which operations are available; strict policy mode requires Enterprise.
 
 ### Claude Desktop installer
 
