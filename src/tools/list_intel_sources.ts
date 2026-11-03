@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { defineTool, formatApiError, textOk } from './shared.js';
 
+// Preserve valid API dates verbatim; never invent a freshness fallback.
+const displayDate = (value: string | null | undefined): string =>
+  typeof value === 'string' && value.trim() && Number.isFinite(Date.parse(value)) ? value : 'unknown';
+
 export const listIntelSourcesTool = defineTool({
   name: 'list_intel_sources',
   title: 'List available intelligence sources',
@@ -23,8 +27,8 @@ export const listIntelSourcesTool = defineTool({
         `- ${source.name} — id: ${source.id}; ${source.scope === 'organization' ? 'organization-owned' : 'global'}; ` +
         `${source.item_count ?? 0} items; platforms: ${source.platforms?.join(', ') || 'unspecified'}; ` +
         `enabled: ${source.is_enabled}; premium: ${source.is_premium}; ` +
-        `created: ${source.created_at ?? 'unknown'}; updated: ${source.updated_at ?? 'unknown'}; ` +
-        `last synced: ${source.last_sync ?? 'unknown'}; last checked: ${source.last_checked_at ?? 'unknown'}`,
+        `created: ${displayDate(source.created_at)}; updated: ${displayDate(source.updated_at)}; ` +
+        `last synced: ${displayDate(source.last_sync)}; last checked: ${displayDate(source.last_checked_at)}`,
       );
       return textOk(
         `Found ${result.total} intelligence source(s). Showing ${result.sources.length} at offset ${result.offset}.` +

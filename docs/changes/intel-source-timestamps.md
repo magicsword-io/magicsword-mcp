@@ -5,7 +5,7 @@
 `GET /api/public/v1/intel/sources`. Structured content preserves the API response.
 
 Dates are optional and nullable for compatibility with older portal versions.
-Missing dates display as `unknown`; they never fall back to a different date.
+Missing, blank, or invalid dates display as `unknown`; they never fall back to a different date.
 `updated_at` covers source metadata/content writes. `last_sync` is the existing
 source sync timestamp. Neither proves an unchanged source was checked recently.
 `last_checked_at` records a successful collector collection, including unchanged
