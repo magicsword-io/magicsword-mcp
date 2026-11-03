@@ -78,7 +78,7 @@ async function smokeMcpServer(mode) {
     ]) {
       assert(toolNames.includes(required), `MCP server did not register required tool ${required}`);
     }
-    assert(toolNames.length === 23, `MCP server registered the wrong number of tools: ${toolNames.length}`);
+    assert(toolNames.length === 25, `MCP server registered the wrong number of tools: ${toolNames.length}`);
     const listEndpoints = listed.tools.find((tool) => tool.name === 'list_endpoints');
     const flipToEnforcing = listed.tools.find((tool) => tool.name === 'flip_to_enforcing');
     assert(listEndpoints?.annotations?.readOnlyHint === true, 'list_endpoints is not marked read-only');
@@ -259,9 +259,17 @@ async function smokeToolHandlers() {
         since: '2026-01-01T00:00:00Z',
       };
     },
-    async assignPolicyToEndpoints(policyId, endpointIds) {
-      calls.push(['assignPolicyToEndpoints', policyId, endpointIds]);
-      return { assigned: endpointIds.length };
+    async previewPolicyAssignment(policyId, selector) {
+      calls.push(['previewPolicyAssignment', policyId, selector]);
+      return { policy_id: policyId, current_version_id: policy.current_version.id,
+        platform: 'windows', status: 'audit', policy_mode: 'blocklist', endpoint_count: 1,
+        would_assign: [{ id: endpointId, computer_name: 'smoke-win-01', platform: 'windows', policy_id: null, desired_policy_ids: [] }],
+        requires_confirmation: true, confirmation: { token: 'msac_' + 'a'.repeat(43), expires_at: '2100-01-01T00:00:00Z', action: 'policy.assign' } };
+    },
+    async assignPolicyWithConfirmation(policyId, token) {
+      calls.push(['assignPolicyWithConfirmation', policyId, token]);
+      return { success: true, policy_id: policyId, current_version_id: policy.current_version.id,
+        updated: 1, endpoint_ids: [endpointId], assignment_status: 'pending_checkin' };
     },
     async upgradeEndpoint(requestedEndpointId, targetVersion) {
       calls.push(['upgradeEndpoint', requestedEndpointId, targetVersion]);
@@ -381,16 +389,16 @@ async function smokeToolHandlers() {
   );
   assert(policyPreview.content[0].text.includes('PREVIEW'), 'policy assignment did not preview before mutation');
   assert(
-    !calls.some((call) => call[0] === 'assignPolicyToEndpoints'),
-    'policy assignment mutated without confirm=true',
+    !calls.some((call) => call[0] === 'assignPolicyWithConfirmation'),
+    'policy assignment mutated without a server token',
   );
   await applyPolicyToEndpointsTool.handler(
-    { policy_id: policy.id, endpoint_ids: [endpointId], confirm: true },
+    { policy_id: policy.id, confirmation_token: policyPreview.structuredContent.confirmation.token },
     { client: fakeClient },
   );
   assert(
-    calls.some((call) => call[0] === 'assignPolicyToEndpoints'),
-    'policy assignment did not mutate with confirm=true',
+    calls.some((call) => call[0] === 'assignPolicyWithConfirmation'),
+    'policy assignment did not commit with its server token',
   );
 
   const upgradePreview = await upgradeEndpointsTool.handler(

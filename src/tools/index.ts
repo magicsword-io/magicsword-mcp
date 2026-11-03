@@ -6,6 +6,8 @@ import { listIntelSourcesTool } from './list_intel_sources.js';
 import { triageAlertTool } from './triage_alert.js';
 import { listPoliciesTool } from './list_policies.js';
 import { createPolicyTool } from './create_policy.js';
+import { clonePolicyTool } from './clone_policy.js';
+import { listEndpointGroupsTool } from './list_endpoint_groups.js';
 import { showPolicyTool } from './show_policy.js';
 import { managePolicyRulesTool } from './manage_policy_rules.js';
 import { applyPolicyToEndpointsTool } from './apply_policy_to_endpoints.js';
@@ -26,6 +28,7 @@ import type { ToolAnnotations } from '@modelcontextprotocol/server';
 export const allTools = [
   whoamiTool,
   listEndpointsTool,
+  listEndpointGroupsTool,
   showEndpointTool,
   listAgentReleasesTool,
   findAlertsTool,
@@ -33,6 +36,7 @@ export const allTools = [
   triageAlertTool,
   listPoliciesTool,
   createPolicyTool,
+  clonePolicyTool,
   showPolicyTool,
   managePolicyRulesTool,
   applyPolicyToEndpointsTool,
@@ -52,6 +56,7 @@ export const allTools = [
 const READ_ONLY_TOOLS = new Set([
   'whoami',
   'list_endpoints',
+  'list_endpoint_groups',
   'show_endpoint',
   'list_agent_releases',
   'find_alerts',
