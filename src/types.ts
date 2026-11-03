@@ -212,10 +212,14 @@ export interface CustomerIntelFeedsResponse {
   offset?: number;
 }
 
-export interface IntelSource extends CustomerIntelFeed {
+export interface IntelSource extends Omit<CustomerIntelFeed, 'created_at' | 'updated_at'> {
   scope: 'global' | 'organization';
   source_kind: string | null;
   is_premium: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  last_sync?: string | null;
+  last_checked_at?: string | null;
 }
 
 export interface IntelSourcesResponse {
