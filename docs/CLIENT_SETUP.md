@@ -22,6 +22,14 @@ the server can discover its tools and make authorized read-only production calls
 - SETUP-06: Public install buttons decode to credential-free production stdio
   entries for Cursor and VS Code/Insiders. One-liners and manual JSON fallbacks
   accompany them. Saving credentials is a separate prerequisite for buttons.
+- SETUP-07: Microsoft Copilot Studio uses the portal's separately enabled hosted
+  Streamable HTTP connector with OAuth 2.0 dynamic discovery. The setup guide
+  uses the environment's configured connector URL; it never invents a remote
+  endpoint or registers a local stdio command as a cloud connection. Native
+  setup selects User authentication / End user credentials in a supported
+  channel; a maker's connection does not verify per-user access. Native
+  verification must cover sign-in, organization/scopes, `whoami`,
+  `list_endpoints`, refresh and disconnect before compatibility is announced.
 
 Assurance: A3 for credential handling and client registration. Independent review
 and real stdio/read-only production evidence are required before release. GUI
@@ -33,6 +41,7 @@ Client installation references:
 - [Cursor install links](https://cursor.com/docs/mcp/install-links)
 - [VS Code MCP developer guide](https://code.visualstudio.com/api/extension-guides/ai/mcp)
 - [Microsoft's install-button examples](https://github.com/MicrosoftDocs/mcp)
+- [Microsoft Copilot Studio MCP setup](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent)
 - [Codex MCP configuration](https://developers.openai.com/codex/mcp/)
 - [Claude Code MCP configuration](https://code.claude.com/docs/en/mcp)
 

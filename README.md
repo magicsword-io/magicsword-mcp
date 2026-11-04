@@ -10,6 +10,10 @@ The server is a thin, opinionated wrapper around the
 `/api/public/v1/*` customer API exposed by the Magic Portal. It runs on
 the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
+For Microsoft Copilot Studio, use the portal's hosted Streamable HTTP connector
+with OAuth instead. Hosted access must be enabled by your MagicSword
+administrator; the npm package remains a local stdio server.
+
 ## Quick start
 
 > **Free to use.** MagicSword MCP and the customer API are available on the
@@ -187,6 +191,40 @@ MCP transport; this package provides a local stdio server.
 If you need a per-client override instead of `~/.magicsword/mcp.json`, set
 `MAGICSWORD_API_KEY` and optionally `MAGICSWORD_BASE_URL` in that MCP host's
 environment. Keep API keys out of shared config snippets and screenshots.
+
+## Microsoft Copilot Studio
+
+Use the **hosted connector** shown at **Magic Portal → Settings → API Keys →
+MCP setup**, or on your portal's `/mcp` page. If that environment does not show a
+connector URL, hosted access has not been enabled there. A local npm install
+cannot make the server reachable from Copilot Studio.
+
+1. In Copilot Studio, open your agent's **Tools → Add a tool → New tool →
+   Model Context Protocol**.
+2. Set **Server name** to `MagicSword`. For **Server description**, use:
+   `Investigate MagicSword endpoints, alerts, policies, and intelligence using the permissions you approve.`
+   Paste the exact enabled portal connector URL into **Server URL**.
+3. Choose **OAuth 2.0 → Dynamic discovery**, then **Create → Next**.
+4. Select **Create a new connection**, sign in to MagicSword, choose your
+   organization, and approve read permissions first. Select **Add to agent**.
+5. In the added tool's Authentication settings, choose **User authentication
+   (End user credentials)** and use a supported channel. Each person must connect
+   with their own MagicSword account rather than sharing the author's grant.
+6. In the agent's test chat, ask:
+
+   > Use MagicSword to call whoami, then list_endpoints. Show the connected
+   > organization, my approved permissions, and my devices. Do not make any changes.
+
+Copilot Studio uses Streamable HTTP. Do not select API-key authentication or
+paste a Settings API key into the hosted connector; it accepts OAuth access
+tokens. Each user should connect with their own account. Your Power Platform
+data policies must allow the connector.
+
+See the [Copilot Studio connection and verification guide](docs/COPILOT_STUDIO.md)
+and [Microsoft's setup documentation](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent).
+Native tenant verification is required before announcing tested compatibility.
+See [Microsoft's user-authentication guidance](https://learn.microsoft.com/en-us/microsoft-copilot-studio/configure-enduser-authentication)
+for supported channels and connection behavior.
 
 ## Tools
 
