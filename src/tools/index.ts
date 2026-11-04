@@ -9,6 +9,7 @@ import { createPolicyTool } from './create_policy.js';
 import { clonePolicyTool } from './clone_policy.js';
 import { listEndpointGroupsTool } from './list_endpoint_groups.js';
 import { showPolicyTool } from './show_policy.js';
+import { downloadPolicyTool } from './download_policy.js';
 import { managePolicyRulesTool } from './manage_policy_rules.js';
 import { applyPolicyToEndpointsTool } from './apply_policy_to_endpoints.js';
 import { flipToEnforcingTool } from './flip_to_enforcing.js';
@@ -38,6 +39,7 @@ export const allTools = [
   createPolicyTool,
   clonePolicyTool,
   showPolicyTool,
+  downloadPolicyTool,
   managePolicyRulesTool,
   applyPolicyToEndpointsTool,
   flipToEnforcingTool,

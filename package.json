@@ -23,7 +23,7 @@
     "build": "node scripts/clean.mjs && tsc -p tsconfig.json && node scripts/postbuild.mjs",
     "start": "node dist/index.js",
     "configure": "node dist/index.js configure",
-    "test": "npm run build && node --test scripts/auto-release.test.mjs scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs scripts/policy-rules.test.mjs scripts/policy-rules-stdio.test.mjs scripts/tools-stdio.test.mjs scripts/enforcement.test.mjs scripts/intel-sources.test.mjs scripts/investigate.test.mjs scripts/create-policy.test.mjs scripts/clone-assignment.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
+    "test": "npm run build && node --test scripts/auto-release.test.mjs scripts/verify-release.test.mjs scripts/configure.test.mjs scripts/install-links.test.mjs scripts/policy-rules.test.mjs scripts/policy-rules-stdio.test.mjs scripts/tools-stdio.test.mjs scripts/enforcement.test.mjs scripts/intel-sources.test.mjs scripts/investigate.test.mjs scripts/create-policy.test.mjs scripts/clone-assignment.test.mjs scripts/policy-download.test.mjs && node scripts/client.mjs && node scripts/smoke.mjs",
     "test:package": "npm run build && node scripts/package-smoke.mjs",
     "bundle:desktop": "npm run build && node scripts/build-mcpb.mjs",
     "test:desktop": "node scripts/desktop-smoke.mjs",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.3.1",
+    "fast-xml-parser": "5.12.0",
     "undici": "^7.30.1",
     "zod": "^4.6.7"
   },

@@ -1,5 +1,6 @@
 import type { PolicyRuleInput } from './policy-rules.js';
 import { request as undiciRequest } from 'undici';
+import { POLICY_DOWNLOAD_MAX_BYTES, validatePolicyDownload, type PolicyDownload, type PolicyDownloadFormat } from './policy-download.js';
 import type {
   AgentReleasesResponse,
   AlertDetailResponse,
@@ -213,6 +214,43 @@ export class MagicSwordClient {
 
   policy(policyId: string): Promise<PolicyDetailResponse> {
     return this.req<PolicyDetailResponse>('GET', `/policies/${MagicSwordClient.pathId(policyId)}`);
+  }
+
+  /** Generation may take 50 seconds. Binary artifacts have a separate 32 MiB cap. */
+  async downloadPolicy(policyId: string, format: PolicyDownloadFormat = 'wdac'): Promise<PolicyDownload> {
+    const url = new URL(`${this.baseUrl}/api/public/v1/policies/${MagicSwordClient.pathId(policyId)}/download`);
+    url.searchParams.set('format', format);
+    const timeout = Math.max(this.requestTimeoutMs, 60_000);
+    try {
+      const response = await undiciRequest(url, {
+        // undici.request does not follow redirects without an opt-in interceptor.
+        method: 'GET',
+        headers: { authorization: `Bearer ${this.apiKey}`, 'user-agent': this.userAgent,
+          accept: format === 'wdac' ? 'application/zip' : 'application/xml' },
+        headersTimeout: timeout, bodyTimeout: timeout, signal: AbortSignal.timeout(timeout),
+      });
+      response.body.on('error', () => {});
+      if (response.statusCode !== 200) {
+        response.body.destroy();
+        // Never include server text, auth headers or generated XML in an error.
+        throw new MagicSwordApiError(response.statusCode, { error: 'Policy download request failed.' }, url.toString());
+      }
+      const chunks: Buffer[] = [];
+      let total = 0;
+      for await (const chunk of response.body) {
+        const buffer = Buffer.from(chunk);
+        total += buffer.length;
+        if (total > POLICY_DOWNLOAD_MAX_BYTES) {
+          response.body.destroy();
+          throw new MagicSwordTransportError('Policy download exceeded the 32 MiB size limit.');
+        }
+        chunks.push(buffer);
+      }
+      return validatePolicyDownload(Buffer.concat(chunks, total), format, response.headers);
+    } catch (error) {
+      if (error instanceof MagicSwordApiError || error instanceof MagicSwordTransportError) throw error;
+      throw new MagicSwordTransportError('Policy download failed or returned an invalid artifact.');
+    }
   }
 
   createPolicy(body: { name: string; platform: 'windows' | 'macos' | 'linux'; policy_mode?: 'blocklist' | 'strict' }): Promise<unknown> {

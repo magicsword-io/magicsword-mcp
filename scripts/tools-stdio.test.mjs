@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { zipSync } from 'fflate';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -17,14 +19,15 @@ const alert = { id: alertId, severity: 'high', title: 'Fixture alert', created_a
 const page = (key, value) => ({ [key]: [value], total: 1, limit: 1, offset: 0 });
 const expectedTools = [
   'whoami', 'list_endpoint_groups', 'clone_policy', 'list_endpoints', 'show_endpoint', 'list_agent_releases', 'find_alerts', 'list_events',
-  'triage_alert', 'list_policies', 'create_policy', 'show_policy', 'manage_policy_rules', 'apply_policy_to_endpoints',
+  'triage_alert', 'list_policies', 'create_policy', 'show_policy', 'download_policy', 'manage_policy_rules', 'apply_policy_to_endpoints',
   'flip_to_enforcing', 'list_customer_intel_feeds', 'list_intel_sources', 'manage_customer_intel_feed', 'manage_customer_intel_item',
   'upsert_customer_intel_items', 'manage_policy_intel_sources', 'upgrade_endpoints', 'request_endpoint_checkin',
   'mint_enrollment_token', 'agent_install_instructions',
 ];
 
 for (const mode of ['auto', 'legacy']) {
-  test(`all 25 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
+  test(`all 26 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
+    const outputDirectory = await mkdtemp(join(tmpdir(), 'mcp-download-stdio-'));
     const pending = [];
     const exercised = new Set();
     const failures = [];
@@ -44,7 +47,8 @@ for (const mode of ['auto', 'legacy']) {
         assert.deepEqual(Object.fromEntries(url.searchParams), expected.query ?? {});
         assert.deepEqual(raw ? JSON.parse(raw) : undefined, expected.body);
         response.statusCode = expected.status ?? 200;
-        response.end(JSON.stringify(expected.result));
+        if (expected.headers) for (const [name, value] of Object.entries(expected.headers)) response.setHeader(name, value);
+        response.end(expected.binary ?? JSON.stringify(expected.result));
       } catch (error) {
         failures.push(error);
         response.statusCode = 500;
@@ -78,6 +82,17 @@ for (const mode of ['auto', 'legacy']) {
       await client.connect(transport);
       assert.deepEqual((await client.listTools()).tools.map(t => t.name).sort(), [...expectedTools].sort());
       await call('whoami', {}, [get('/me', { org: { id: id(1), name: 'Fixture' }, key_id: 'fixture-key', scopes: ['policies:read'] })]);
+      for (const format of ['wdac', 'applocker']) {
+        const xml = Buffer.from(format === 'wdac' ? '<SiPolicy xmlns="urn:schemas-microsoft-com:sipolicy"/>' : '<AppLockerPolicy Version="1"/>');
+        const bytes = format === 'wdac' ? Buffer.from(zipSync({ 'base.xml': xml })) : xml;
+        const downloaded = await call('download_policy', { policy_id: policyId, format, output_directory: outputDirectory }, [{
+          ...get(`/policies/${policyId}/download`, undefined, { format }), binary: bytes,
+          headers: { 'content-type': format === 'wdac' ? 'application/zip' : 'application/xml',
+            'x-magicsword-policy-version-id': id(102), 'x-magicsword-policy-xml-file-count': '1',
+            'x-magicsword-applocker-projection-summary': '{"totalRules":1}' },
+        }]);
+        assert.deepEqual(await readFile(downloaded.structuredContent.path), bytes);
+      }
       const endpoints = page('endpoints', endpoint);
       await call('list_endpoints', { platform: 'windows', status: 'active', hostname_pattern: 'test-*', limit: 1, offset: 0 }, [get('/endpoints', endpoints, { platform: 'windows', status: 'active', hostname_pattern: 'test-*', limit: '1', offset: '0' })]);
       await call('show_endpoint', { endpoint_id: endpointId }, [get(`/endpoints/${endpointId}`, { endpoint })]);
@@ -186,6 +201,7 @@ for (const mode of ['auto', 'legacy']) {
       await call('whoami', {}, [denied], true);
       assert.deepEqual([...exercised].sort(), [...expectedTools].sort());
     } finally {
+      await rm(outputDirectory, { recursive: true, force: true });
       await client.close();
       server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
