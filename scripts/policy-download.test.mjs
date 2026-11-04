@@ -214,3 +214,26 @@ test('DOWNLOAD-014 streamed oversized HTTP response is aborted before validation
     assert.equal(requests, 1);
   });
 });
+
+test('DOWNLOAD-015 a 1001-member archive downloads and saves intact; over-count fails instead of truncating', async () => {
+  const files = Object.fromEntries(Array.from({ length: 1001 }, (_, n) => [`policy-${n}.xml`, xml]));
+  const bytes = Buffer.from(zipSync(files));
+  const directory = await mkdtemp(join(tmpdir(), 'magicsword-download-many-'));
+  try {
+    await httpFixture((_request, response) => {
+      response.writeHead(200, { ...headers('wdac'), 'x-magicsword-policy-xml-file-count': '1001' });
+      response.end(bytes);
+    }, async client => {
+      const result = await invoke({ policy_id: policyId, output_directory: directory }, client);
+      assert.ok(!result.isError, result.content[0].text);
+      assert.equal(result.structuredContent.xml_file_count, 1001);
+      assert.deepEqual(await readFile(result.structuredContent.path), bytes);
+      assert.equal(result.structuredContent.sha256, createHash('sha256').update(bytes).digest('hex'));
+    });
+    const boundary = Buffer.from(zipSync(Object.fromEntries(Array.from({ length: 4096 }, (_, n) => [`policy-${n}.xml`, xml]))));
+    assert.equal(validatePolicyDownload(boundary, 'wdac', { ...headers('wdac'), 'x-magicsword-policy-xml-file-count': '4096' }).fileCount, 4096);
+    const overCount = Buffer.from(zipSync(Object.fromEntries(Array.from({ length: 4097 }, (_, n) => [`policy-${n}.xml`, xml]))));
+    assert.throws(() => validatePolicyDownload(overCount, 'wdac', { ...headers('wdac'), 'x-magicsword-policy-xml-file-count': '4097' }));
+    assert.equal((await readdir(directory)).length, 1, 'over-count must not save a partial second archive');
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

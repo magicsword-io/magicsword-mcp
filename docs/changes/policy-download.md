@@ -27,6 +27,8 @@ file to Downloads or an explicitly requested directory.
   resource+safe filename/hash/version/count. Up to2MiB inline so base64JSON fits
   the4.5MB buffered response envelope. Larger responses explain authenticatedAPI
   orlocalMCP fallback without exposing credentials or public/signedURLs.
+- DOWNLOAD-015: A 1001-member archive must survive actual authenticated binary
+  HTTP and local save byte-for-byte; over4096 must reject as a whole, never truncate.
 - DOWNLOAD-013: AppLocker blocklist projection preserves source audit/enforcing
   mode. Return aggregate projection summary + explicit omission/semantic warning.
   Never claim WDAC strict equivalence, compilation, installation or assignment.

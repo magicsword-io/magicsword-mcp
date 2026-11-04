@@ -276,7 +276,9 @@ save, with the same version/hash metadata. It cannot write to your computer and
 does not accept `output_directory`. Client attachment support varies. Hosted
 attachments are limited to **2 MiB** so the base64 response fits the hosting limit;
 use local MCP or the authenticated API for larger artifacts. API/local WDAC
-archives are capped at 32 MiB (30 MiB XML); AppLocker exports must be below
+archives include up to **4,096 XML files** and are capped at 32 MiB (30 MiB XML).
+Every generated member must fit these bounds; an over-limit export fails as a
+whole rather than dropping files. AppLocker exports must be below
 4,000,000 bytes. Nothing is extracted or executed by the tool.
 
 **Direct API:** agentless customers can call either endpoint with a Customer API
