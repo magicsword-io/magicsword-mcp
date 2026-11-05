@@ -10,6 +10,10 @@ The server is a thin, opinionated wrapper around the
 `/api/public/v1/*` customer API exposed by the Magic Portal. It runs on
 the user's machine, holds an `msk_…` API key, and speaks MCP over stdio.
 
+For Microsoft Copilot Studio, use the portal's hosted Streamable HTTP connector
+with OAuth instead. Hosted access must be enabled by your MagicSword
+administrator; the npm package remains a local stdio server.
+
 ## Quick start
 
 > **Free to use.** MagicSword MCP and the customer API are available on the
@@ -179,7 +183,7 @@ Manual setup prints a credential-free launch entry for other local stdio MCP
 clients. Unattended setup without `--client` writes only the MagicSword file.
 
 Restart the selected client or start a new session to load `magicsword` and its
-25 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
+26 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
 discovery alone does not verify API-key scopes. Claude Desktop logs are at
 `~/Library/Logs/Claude/mcp*.log` on macOS. Browser-only clients require a remote
 MCP transport; this package provides a local stdio server.
@@ -187,6 +191,40 @@ MCP transport; this package provides a local stdio server.
 If you need a per-client override instead of `~/.magicsword/mcp.json`, set
 `MAGICSWORD_API_KEY` and optionally `MAGICSWORD_BASE_URL` in that MCP host's
 environment. Keep API keys out of shared config snippets and screenshots.
+
+## Microsoft Copilot Studio
+
+Use the **hosted connector** shown at **Magic Portal → Settings → API Keys →
+MCP setup**, or on your portal's `/mcp` page. If that environment does not show a
+connector URL, hosted access has not been enabled there. A local npm install
+cannot make the server reachable from Copilot Studio.
+
+1. In Copilot Studio, open your agent's **Tools → Add a tool → New tool →
+   Model Context Protocol**.
+2. Set **Server name** to `MagicSword`. For **Server description**, use:
+   `Investigate MagicSword endpoints, alerts, policies, and intelligence using the permissions you approve.`
+   Paste the exact enabled portal connector URL into **Server URL**.
+3. Choose **OAuth 2.0 → Dynamic discovery**, then **Create → Next**.
+4. Select **Create a new connection**, sign in to MagicSword, choose your
+   organization, and approve read permissions first. Select **Add to agent**.
+5. In the added tool's Authentication settings, choose **User authentication
+   (End user credentials)** and use a supported channel. Each person must connect
+   with their own MagicSword account rather than sharing the author's grant.
+6. In the agent's test chat, ask:
+
+   > Use MagicSword to call whoami, then list_endpoints. Show the connected
+   > organization, my approved permissions, and my devices. Do not make any changes.
+
+Copilot Studio uses Streamable HTTP. Do not select API-key authentication or
+paste a Settings API key into the hosted connector; it accepts OAuth access
+tokens. Each user should connect with their own account. Your Power Platform
+data policies must allow the connector.
+
+See the [Copilot Studio connection and verification guide](docs/COPILOT_STUDIO.md)
+and [Microsoft's setup documentation](https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent).
+Native tenant verification is required before announcing tested compatibility.
+See [Microsoft's user-authentication guidance](https://learn.microsoft.com/en-us/microsoft-copilot-studio/configure-enduser-authentication)
+for supported channels and connection behavior.
 
 ## Tools
 
@@ -203,6 +241,7 @@ environment. Keep API keys out of shared config snippets and screenshots.
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
 | `create_policy`               | Creates a new empty audit policy for Windows, macOS, or Linux without assigning devices. Requires `policies:write`. |
 | `clone_policy`                | Copies a policy into an independent audit policy with its rules, settings, intelligence links and collection links; no computers assigned. |
+| `download_policy`             | Downloads the current Windows policy as a complete WDAC XML ZIP or AppLocker XML; local MCP saves to Downloads or a requested directory. Requires `policies:read` and Enterprise agentless export. |
 | `show_policy`                 | Shows one policy by id.                                                                                                        |
 | `manage_policy_rules`         | Lists rules or adds explicit / event-derived rules to a policy by id or name. Avoid explicit flat hash rules for Windows WDAC. |
 | `apply_policy_to_endpoints`   | Previews assignment to computer IDs, hostname matches, or groups; a server-issued `confirmation_token` commits the approved snapshot.                                |
@@ -223,12 +262,96 @@ Write tools require matching Customer API scopes in Magic Portal, such as
 Event review uses `alerts:read`; turning selected events into policy rules
 uses `policies:write`. Cloning requires `policies:write`; group discovery requires
 `endpoints:read`; assignment preview and commit require **both** `policies:write`
-and `endpoints:read`.
+and `endpoints:read`. Policy download uses `policies:read` and requires Enterprise agentless export access.
 
 Tools publish standard MCP safety annotations. Read-only discovery tools are
 marked read-only and idempotent; enforcement, deletion, policy assignment,
 rule changes, and agent upgrades are marked destructive so MCP clients can
-apply appropriate confirmation UX.
+apply appropriate confirmation UX. Local `download_policy` is marked as a non-destructive write because it creates a file; hosted download is read-only and returns a resource.
+
+## Downloading policies for agentless deployment
+
+Ask **“Download my Finance policy as WDAC and put it in Downloads”** or
+**“Download its AppLocker XML to Downloads.”** The client finds the Windows
+policy with `list_policies`, then calls:
+
+```json
+{ "policy_id": "<Windows policy UUID>", "format": "wdac" }
+```
+
+Use `"format": "applocker"` for AppLocker. With the local stdio server, files go
+to `~/Downloads` on the machine running the MCP server. To choose another folder:
+
+```json
+{
+  "policy_id": "<Windows policy UUID>",
+  "format": "applocker",
+  "output_directory": "~/Downloads/Finance"
+}
+```
+
+Absolute Windows paths work too (escape backslashes in JSON). The directory is
+created if needed. Downloads use new filenames, so existing files are preserved.
+The result includes the saved **path, SHA256, byte count and policy version ID**.
+A failed or invalid response is not saved. Downloading does not install, assign,
+activate, or change the policy's audit/enforcing mode.
+
+WDAC downloads contain **all generated XML files** for that version: base and
+supplementals when applicable, plus signer, customer and intelligence block
+policies. These are XML source files, not compiled `.cip` files. Review and
+compile them with Windows tooling before deployment. AppLocker is the same
+**blocklist projection** used by the Portal's Compatible Windows download; it
+cannot reproduce WDAC strict allowlisting. Review its returned projection summary
+for omitted rules and weaker or broader matches before deploying it. Policies
+with no compatible AppLocker rules return an error instead of a clearing policy.
+
+Downloads require **`policies:read` and Enterprise agentless deployment access**.
+The API exports the current Windows version and rejects a change detected while
+preparing it; macOS and Linux exports are not supported by this tool.
+
+**Hosted MCP:** `download_policy` returns an attached resource for the client to
+save, with the same version/hash metadata. It cannot write to your computer and
+does not accept `output_directory`. Client attachment support varies. Hosted
+attachments are limited to **2 MiB** so the base64 response fits the hosting limit;
+use local MCP or the authenticated API for larger artifacts. API/local WDAC
+archives include up to **4,096 XML files** and are capped at 32 MiB (30 MiB XML).
+Every generated member must fit these bounds; an over-limit export fails as a
+whole rather than dropping files. AppLocker exports must be below
+4,000,000 bytes. Nothing is extracted or executed by the tool.
+
+**Direct API:** agentless customers can call either endpoint with a Customer API
+key; no installed MagicSword agent is required:
+
+| Request | Response |
+| --- | --- |
+| `GET /api/public/v1/policies/{policyId}/download?format=wdac` | Complete WDAC XML ZIP; `format` defaults to `wdac`. |
+| `GET /api/public/v1/policies/{policyId}/download?format=applocker` | AppLocker XML with projection summary headers. |
+
+For example, with `MAGICSWORD_API_KEY` set privately and `POLICY_ID` set to your
+Windows policy UUID, create a new download directory and fetch the archive:
+
+```sh
+download_dir="$(mktemp -d "$HOME/Downloads/magicsword-policy.XXXXXX")"
+curl --fail --silent --show-error \
+  --header "Authorization: Bearer $MAGICSWORD_API_KEY" \
+  --dump-header "$download_dir/headers.txt" \
+  --output "$download_dir/policy.zip" \
+  "https://www.magicsword.io/api/public/v1/policies/$POLICY_ID/download?format=wdac"
+```
+
+For AppLocker, change `format=applocker` and the output name to `policy.xml`.
+Check the command succeeds before using its output. Headers include
+`X-MagicSword-Policy-Version-ID`, `X-MagicSword-Policy-Xml-File-Count`, and
+`X-MagicSword-Policy-Artifact-Format`; AppLocker also includes
+`X-MagicSword-AppLocker-Projection-Summary`. Responses are private, streamed
+attachments with `Cache-Control: no-store`. No public Storage URL or API key is
+included in the downloaded artifact.
+
+The API uses the same generators as the Portal's download buttons. Agent-delivery
+artifacts may also be cached in Supabase Storage; this customer export generates
+from the current policy rows without writing to that cache or changing policy
+metadata. Existing stored policy GUID metadata is reused when available; an
+export is not a device synchronization protocol.
 
 ## Creating a policy
 
@@ -565,7 +688,7 @@ Tests validate `--help`, `--version`, production-default migration, private clie
 registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-all 25 tools' HTTP contracts and confirmation flows over modern and legacy
+all 26 tools' HTTP contracts and confirmation flows over modern and legacy
 stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
 actual mutation counts, and npm pack
 contents. `test:package` installs a production-only tarball and
