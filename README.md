@@ -183,7 +183,7 @@ Manual setup prints a credential-free launch entry for other local stdio MCP
 clients. Unattended setup without `--client` writes only the MagicSword file.
 
 Restart the selected client or start a new session to load `magicsword` and its
-26 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
+27 tools. Ask it to call `whoami` and then `list_endpoints` to verify access;
 discovery alone does not verify API-key scopes. Claude Desktop logs are at
 `~/Library/Logs/Claude/mcp*.log` on macOS. Browser-only clients require a remote
 MCP transport; this package provides a local stdio server.
@@ -237,6 +237,7 @@ for supported channels and connection behavior.
 | `list_agent_releases`         | Lists available agent versions and per-platform latest releases.                                                               |
 | `find_alerts`                 | Searches alerts by severity / ack state / since / hostname / MITRE technique.                                                  |
 | `list_events`                 | Searches Investigate events by name, filename, path, hash, publisher, computer, or package family, with type/status/policy/endpoint/time filters. |
+| `list_audit_logs`             | Lists verified organization administrative activity by action, actor, or time. Requires Enterprise and `audit:read`. |
 | `triage_alert`                | Fetches one alert directly with triggering events, metadata, and file context; optionally acknowledges or dismisses it.        |
 | `list_policies`               | Lists policies with current version + mode.                                                                                    |
 | `create_policy`               | Creates a new empty audit policy for Windows, macOS, or Linux without assigning devices. Requires `policies:write`. |
@@ -263,6 +264,12 @@ Event review uses `alerts:read`; turning selected events into policy rules
 uses `policies:write`. Cloning requires `policies:write`; group discovery requires
 `endpoints:read`; assignment preview and commit require **both** `policies:write`
 and `endpoints:read`. Policy download uses `policies:read` and requires Enterprise agentless export access.
+
+To use `list_audit_logs`, select **Read organization
+audit logs** when creating the API key. The tool can show server-authored
+records with verified tenant attribution, starting when the portal enables
+attribution. Use `limit` and `offset` to paginate and `since` and `before` to
+keep a fixed time range. The default lookback is 30 days.
 
 Tools publish standard MCP safety annotations. Read-only discovery tools are
 marked read-only and idempotent; enforcement, deletion, policy assignment,
@@ -688,7 +695,7 @@ Tests validate `--help`, `--version`, production-default migration, private clie
 registration, preservation and rollback, configure validation, secret redaction,
 modern and legacy MCP startup, focused mutation confirmation, retry and timeout
 semantics, response-size bounds, malformed responses, write non-retry behavior,
-all 26 tools' HTTP contracts and confirmation flows over modern and legacy
+all 27 tools' HTTP contracts and confirmation flows over modern and legacy
 stdio, explicit filename round trips, invalid rule shapes, ambiguous inputs,
 actual mutation counts, and npm pack
 contents. `test:package` installs a production-only tarball and

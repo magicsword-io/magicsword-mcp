@@ -18,7 +18,7 @@ const endpoint = { id: endpointId, computer_name: 'test-win-01', platform: 'wind
 const alert = { id: alertId, severity: 'high', title: 'Fixture alert', created_at: '2026-10-19T00:00:00Z' };
 const page = (key, value) => ({ [key]: [value], total: 1, limit: 1, offset: 0 });
 const expectedTools = [
-  'whoami', 'list_endpoint_groups', 'clone_policy', 'list_endpoints', 'show_endpoint', 'list_agent_releases', 'find_alerts', 'list_events',
+  'whoami', 'list_endpoint_groups', 'clone_policy', 'list_endpoints', 'show_endpoint', 'list_agent_releases', 'find_alerts', 'list_events', 'list_audit_logs',
   'triage_alert', 'list_policies', 'create_policy', 'show_policy', 'download_policy', 'manage_policy_rules', 'apply_policy_to_endpoints',
   'flip_to_enforcing', 'list_customer_intel_feeds', 'list_intel_sources', 'manage_customer_intel_feed', 'manage_customer_intel_item',
   'upsert_customer_intel_items', 'manage_policy_intel_sources', 'upgrade_endpoints', 'request_endpoint_checkin',
@@ -26,7 +26,7 @@ const expectedTools = [
 ];
 
 for (const mode of ['auto', 'legacy']) {
-  test(`all 26 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
+  test(`all 27 tools use the expected HTTP contracts and confirmation flows (${mode} stdio)`, { timeout: 30000 }, async () => {
     const outputDirectory = await mkdtemp(join(tmpdir(), 'mcp-download-stdio-'));
     const pending = [];
     const exercised = new Set();
@@ -99,6 +99,19 @@ for (const mode of ['auto', 'legacy']) {
       await call('list_agent_releases', { platform: 'windows', latest: true }, [get('/agent-releases', { releases: [{ id: id(701), version: '1.0.0', created_at: '2026-10-19' }] }, { platform: 'windows', latest: 'true' })]);
       await call('find_alerts', { severity: 'high', acknowledged: false, hostname: 'test-*', mitre_technique: 'T1059', limit: 1 }, [get('/alerts', page('alerts', alert), { severity: 'high', acknowledged: 'false', hostname_pattern: 'test-*', mitre_technique: 'T1059', limit: '1' })]);
       await call('list_events', { hours: 24, status: 'audited,blocked', policy_id: policyId, limit: 1 }, [get('/events', { ...page('events', { id: eventId, name: 'test.exe', type: 'filename', status: 'audited' }), since: '2026-10-18' }, { hours: '24', status: 'audited,blocked', policy_id: policyId, limit: '1' })]);
+      const auditArgs = { since: '2026-11-01', before: '2026-11-20', action: 'policy_assigned', actor_id: id(1), limit: 1, offset: 0 };
+      const auditPage = {
+        ...page('audit_logs', { id: '27', action: 'policy_assigned', timestamp: '2026-11-19T00:00:00Z', actor_id: id(1), details: { policy_id: policyId } }),
+        since: auditArgs.since,
+        before: auditArgs.before,
+      };
+      const audit = await call('list_audit_logs', auditArgs, [get('/audit-logs', auditPage, { ...auditArgs, limit: '1', offset: '0' })]);
+      assert.deepEqual(audit.structuredContent, auditPage);
+      await call('list_audit_logs', { organization_id: id(2) }, [], true);
+      const disabledAudit = await call('list_audit_logs', {}, [
+        { ...get('/audit-logs', { error: 'Enterprise required', feature: 'auditReporting' }), status: 403 },
+      ], true);
+      assert.match(disabledAudit.content[0].text, /Enterprise/);
       await call('triage_alert', { alert_id: alertId }, [get(`/alerts/${alertId}`, { alert })]);
       await call('triage_alert', { alert_id: alertId, ack: true, ack_comment: 'Fixture acknowledgement' }, [get(`/alerts/${alertId}`, { alert }), write('POST', `/alerts/${alertId}/acknowledge`, { comment: 'Fixture acknowledgement' })]);
       await call('triage_alert', { alert_id: alertId, dismiss: true, dismiss_reason: 'Fixture dismissal' }, [get(`/alerts/${alertId}`, { alert }), write('POST', `/alerts/${alertId}/dismiss`, { reason: 'Fixture dismissal' })]);
