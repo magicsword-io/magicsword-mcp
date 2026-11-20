@@ -5,6 +5,8 @@ import type {
   AgentReleasesResponse,
   AlertDetailResponse,
   AlertsResponse,
+  AuditLogQuery,
+  AuditLogResponse,
   ApiErrorBody,
   CustomerIntelFeedsResponse,
   CustomerIntelItemsResponse,
@@ -202,6 +204,10 @@ export class MagicSwordClient {
       }
     }
     throw new MagicSwordTransportError('MagicSword API request failed unexpectedly.');
+  }
+
+  auditLogs(query: AuditLogQuery = {}): Promise<AuditLogResponse> {
+    return this.req<AuditLogResponse>('GET', '/audit-logs', { query: { ...query } });
   }
 
   me(): Promise<MeResponse> {

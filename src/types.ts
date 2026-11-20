@@ -7,6 +7,7 @@ export type ApiScope =
   | 'policies:write'
   | 'alerts:read'
   | 'alerts:write'
+  | 'audit:read'
   | 'endpoints:read'
   | 'endpoints:write'
   | 'intel:read'
@@ -125,6 +126,30 @@ export interface EventsResponse {
   limit: number;
   offset: number;
   since: string;
+}
+
+export interface AuditLogQuery {
+  since?: string;
+  before?: string;
+  action?: string;
+  actor_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AuditLogResponse {
+  audit_logs: {
+    id: string;
+    action: string;
+    timestamp: string;
+    actor_id: string | null;
+    details: Record<string, string | number | boolean>;
+  }[];
+  total: number;
+  limit: number;
+  offset: number;
+  since: string;
+  before: string | null;
 }
 
 export interface Alert {

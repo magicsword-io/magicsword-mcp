@@ -58,7 +58,7 @@ function baselinePreserved(before, after) {
 try {
   await client.connect(transport);
   const discovery = await client.listTools();
-  check(discovery.tools.length === 26, '26 tools discovered over stdio');
+  check(discovery.tools.length === 27, '27 tools discovered over stdio');
   const me = await call('whoami');
   check(['policies:read', 'policies:write'].every(scope => me.scopes.includes(scope)), 'authenticated policy read/write scopes');
   const policy = await call('show_policy', { policy_id });
